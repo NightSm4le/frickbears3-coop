@@ -87,7 +87,9 @@ function coop_draw_overlay()
         draw_set_alpha(_flash ? 0.9 : 0.4);
         draw_set_color(_flash ? (_blink ? c_yellow : c_red) : c_white); draw_rectangle(_px, _py, _px + _w, _py + _h, true);
         draw_set_alpha(0.85);
-        var _txt = "P2 ";
+        var _txt = "P" + string(coop_partner_slot()) + " ";
+        var _isz = (_mode == 0) ? 24 : 14;
+        coop_art_partner_portrait((_px > 40) ? _px - _isz - 2 : _px + _w + 2, _py, _isz, 1);
         if (_st[0] != "") { draw_set_color(_st[1]); draw_text(_px + 3, _py + 1, _txt + _st[0]); }
         else if (_mode == 1)
         {
@@ -170,6 +172,7 @@ function coop_title_options()
         (_c.mode == "client") ? "Disconnect" : "Join",
         "IP " + _ip + ((_c.focus == 11) ? _cur : ""),
         "Port " + _port + ((_c.focus == 12) ? _cur : ""),
+        "Settings",
         "Back"
     ];
 }
@@ -194,6 +197,7 @@ function coop_title_select()
         case 1: if (_c.mode == "client") { coop_disconnect("menu"); } else { coop_ui_save(); coop_join(oCoopNet.IpText, real(oCoopNet.PortText)); } break;
         case 2: _c.focus = 11; keyboard_string = oCoopNet.IpText; break;
         case 3: _c.focus = 12; keyboard_string = oCoopNet.PortText; break;
+        case 4: _c.focus = 0; goto_menu("Co-op Settings", 0); return;
         default: _c.focus = 0; goto_menu("Title", coop_title_index()); return;
     }
     goto_menu("Co-op", _keep);

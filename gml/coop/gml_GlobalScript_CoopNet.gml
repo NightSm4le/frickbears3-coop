@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 2,
-    modver: "0.5.0",
+    modver: "0.6.0",
     mode: "off",          // off | host | client
     server: -1,
     sock: -1,             // client: own socket, host: partner socket
@@ -94,6 +94,7 @@ function coop_parse_args()
     }
     coop_spec_parse_args();
     coop_feat_parse_args();
+    coop_more_parse_args();
 }
 
 function coop_is_client() { return global.Coop.mode == "client"; }
@@ -181,6 +182,12 @@ function coop_night_payload()
     if (variable_global_exists("AILevels")) { _m.ai = global.AILevels; }
     if (variable_global_exists("NightSpeedup")) { _m.speedup = global.NightSpeedup; }
     if (variable_global_exists("ShuffleMode")) { _m.shuffle = global.ShuffleMode; }
+    if (global.Night == 6 || global.Night == "Custom")
+    {
+        if (variable_global_exists("Route")) { _m.route = global.Route; }
+        if (variable_global_exists("AllTimeSalvages")) { _m.salv = global.AllTimeSalvages; }
+        if (variable_global_exists("BossPhase")) { _m.bossphase = global.BossPhase; }
+    }
     return _m;
 }
 
@@ -200,12 +207,14 @@ function coop_on_packet(_m)
             _c.status = "partner connected";
             coop_send({ t: "welcome", proto: _c.proto, slot: 2, game: global.CurrentVersion });
             coop_log("handshake ok, mod " + string(variable_struct_get(_m, "modver")));
+            coop_send(coop_cfg_msg());
             if (room == NightOpening || room == Office) { coop_send(coop_night_payload()); }
             break;
         case "welcome": // client side
             _c.connected = true;
             _c.status = "connected as player 2";
             coop_log("welcome, slot " + string(variable_struct_get(_m, "slot")));
+            coop_send(coop_cfg_msg());
             break;
         case "reject":
             coop_log("rejected: " + string(variable_struct_get(_m, "why")));
@@ -227,6 +236,13 @@ function coop_on_packet(_m)
             if (variable_struct_exists(_m, "ai")) { global.AILevels = _m.ai; }
             if (variable_struct_exists(_m, "speedup")) { global.NightSpeedup = _m.speedup; }
             if (variable_struct_exists(_m, "shuffle")) { global.ShuffleMode = _m.shuffle; }
+            if (variable_struct_exists(_m, "route"))
+            {
+                global.Route = _m.route; if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; } if (variable_struct_exists(_m, "bossphase")) { global.BossPhase = _m.bossphase; }
+                if (_m.night == "Custom") { global.Upgrades = []; global.SavedBossTime = 0; global.SummonedAnimatronics = []; global.Challenge = undefined; global.ChallengeTitle = "None"; global.CustomNightMusic = undefined; if (!variable_global_exists("Cheats")) { global.Cheats = array_create(10, false); } }
+                coop_log("BOSS: route " + string(_m.route) + " phase " + (variable_global_exists("BossPhase") ? string(global.BossPhase) : "-") + " from host (boss_fight=" + string(boss_fight_night()) + ")");
+            }
+            coop_log("ECON: difficulty " + string(global.Difficulty) + " from host (one difficulty for both)");
             coop_log("host started night " + string(global.Night));
             if (room != NightOpening && room != Office) { room_goto(NightOpening); }
             break;
@@ -261,6 +277,7 @@ function coop_on_packet(_m)
             break;
         case "win":
             _c.partnerWon = true;
+            if (variable_struct_exists(_m, "er")) { global.CoopE.partnerEr = _m.er; coop_log("ECON: partner's night earnings " + string(_m.er)); }
             coop_log("partner reached 6AM (night " + string(variable_struct_get(_m, "night")) + ")");
             if (_c.bot && room == Office && coop_alive()) { global.CoopS.shotPend = "overlay_survived"; global.CoopS.shotAt = current_time + 2500; }
             break;
@@ -269,7 +286,7 @@ function coop_on_packet(_m)
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
+            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 
@@ -287,7 +304,7 @@ function coop_drop_partner(_why)
 
 function coop_on_win_night()
 {
-    if (global.Coop.connected) { coop_send({ t: "win", night: global.Night }); }
+    if (global.Coop.connected) { coop_send({ t: "win", night: global.Night, er: (is_numeric(global.Night) ? coop_win_earnings() : 0) }); }
     coop_log("win_night night=" + string(global.Night));
 }
 
@@ -372,6 +389,7 @@ function coop_draw_gui()
     coop_stream_tick();
     coop_warn_draw();
     coop_feat_draw();
+    coop_more_draw();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
     if (room == Office && _c.connected) { coop_draw_overlay(); }
     if (!_c.menuOpen) { return; }

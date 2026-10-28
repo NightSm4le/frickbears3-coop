@@ -96,7 +96,9 @@ function coop_spec_win()
     global.Freezeframe = sprite_create_from_surface(_t, 0, 0, _w, _h, false, false, 0, 0);
     surface_free(_t);
     coop_prepare_night();
+    var _coopBefore = variable_global_exists("RunEarnings") ? global.RunEarnings : 0;
     win_night();
+    if (is_numeric(global.Night)) { coop_spec_reward(_coopBefore); }
     coop_log("SPECTATOR: after win_night Deaths=" + json_stringify(global.Deaths) + " StartRoom=" + string(global.StartRoom));
 }
 
@@ -238,6 +240,9 @@ function coop_spec_draw()
     if (coop_partner_get("mk", 0)) { _view = "MASK"; } if (coop_partner_get("pu", 0)) { _view = "PANEL"; }
     draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(0, 0, _gw, 14, false); draw_rectangle(0, _gh - 14, _gw, _gh, false); draw_set_alpha(1);
     draw_set_color(((current_time div 600) mod 2) ? c_red : c_white); draw_text(4, 1, "SPECTATING PARTNER");
+    draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(2, 16, 54, 74, false); draw_set_alpha(1);
+    coop_art_partner_portrait(4, 18, 48, 1);
+    draw_set_color(c_white); draw_text(6, 62, "P" + string(coop_partner_slot()));
     draw_set_color(c_white);
     draw_text(140, 1, string(_hr) + " AM   power " + string(floor(max(_pw, 0))) + "%   doors " + (coop_partner_get("d0", 0) ? "L" : "-") + (coop_partner_get("d1", 0) ? "R" : "-") + "   " + _view);
     draw_set_color(c_ltgray);

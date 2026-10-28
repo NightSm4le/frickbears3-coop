@@ -49,6 +49,9 @@ if (stage == "full")
     }
     // host: report night win to the partner
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function win_night()\n{", "function win_night()\n{\n    coop_on_win_night();");
+    // 0.6.0: maze co-op (host decides catches, enemy hunts the nearest living player), partner purchases
+    g.QueueFindReplace("gml_Object_oMazeEnemy_Step_0", "if (place_meeting(x, y, Player))\n{\n    var NearestPoint = self;", "if (coop_maze_hit())\n{\n    var NearestPoint = self;");
+    g.QueueFindReplace("gml_GlobalScript_UpgradeData", "function acquire_upgrade(arg0)\n{", "function acquire_upgrade(arg0)\n{\n    try { coop_on_upgrade(arg0); } catch (_coopErr) { }");
     // stage 3: shared animatronics
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function jumpscare(arg0, arg1 = 0, arg2 = 0, arg3 = true, arg4 = true)\n{",
         "function jumpscare(arg0, arg1 = 0, arg2 = 0, arg3 = true, arg4 = true)\n{\n    if (coop_jumpscare_gate(arg0)) { exit; }");
@@ -71,13 +74,13 @@ if (stage == "full")
     g.QueueFindReplace("gml_Object_oTitleMenu_Create_0", "array_push(CurrentOptions, \"Quit Game\");",
         "array_push(CurrentOptions, \"Co-op\");\n                array_push(CurrentOptions, \"Quit Game\");");
     g.QueueFindReplace("gml_Object_oTitleMenu_Create_0", "case \"Null\":",
-        "case \"Co-op\":\n            CurrentOptions = coop_title_options();\n            CurrentDesc = coop_title_desc();\n            break;\n        case \"Null\":");
+        "case \"Co-op Settings\":\n            CurrentOptions = coop_set_options();\n            CurrentDesc = coop_set_desc();\n            break;\n        case \"Co-op\":\n            CurrentOptions = coop_title_options();\n            CurrentDesc = coop_title_desc();\n            break;\n        case \"Null\":");
     g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "var Selection = CurrentOptions[SelectedOption];",
-        "var Selection = CurrentOptions[SelectedOption];\n    if (CurMenu == \"Co-op\") { Selection = \"__coop\"; }");
+        "var Selection = CurrentOptions[SelectedOption];\n    if (CurMenu == \"Co-op\") { Selection = \"__coop\"; }\n    if (CurMenu == \"Co-op Settings\") { Selection = \"__coopset\"; }");
     g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "case \"Back\":",
-        "case \"__coop\":\n            coop_title_select();\n            break;\n        case \"Co-op\":\n            goto_menu(\"Co-op\", 0);\n            break;\n        case \"Back\":");
+        "case \"__coopset\":\n            coop_set_select();\n            break;\n        case \"__coop\":\n            coop_title_select();\n            break;\n        case \"Co-op\":\n            goto_menu(\"Co-op\", 0);\n            break;\n        case \"Back\":");
     g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "if (input_check_pressed(UnknownEnum.Value_1) && !Transitioning && CurMenu != \"Remap In Progress\")",
-        "if (CurMenu == \"Co-op\" && input_check_pressed(UnknownEnum.Value_1) && !Transitioning)\n{\n    audio_play_sound(sfxBump, 5, false);\n    coop_title_back();\n    input_clear(UnknownEnum.Value_1);\n}\nif (input_check_pressed(UnknownEnum.Value_1) && !Transitioning && CurMenu != \"Remap In Progress\")");
+        "if (CurMenu == \"Co-op Settings\" && input_check_pressed(UnknownEnum.Value_1) && !Transitioning)\n{\n    audio_play_sound(sfxBump, 5, false);\n    coop_set_back();\n    input_clear(UnknownEnum.Value_1);\n}\nelse if (CurMenu == \"Co-op\" && input_check_pressed(UnknownEnum.Value_1) && !Transitioning)\n{\n    audio_play_sound(sfxBump, 5, false);\n    coop_title_back();\n    input_clear(UnknownEnum.Value_1);\n}\nif (input_check_pressed(UnknownEnum.Value_1) && !Transitioning && CurMenu != \"Remap In Progress\")");
 }
 
 var res = g.Import();
@@ -89,5 +92,9 @@ if (stage == "full")
     if (o == null) throw new Exception("oCoopNet not created");
     o.Persistent = true;
     o.Visible = true;
+    var pe = Data.GameObjects.ByName("oCoopMazePeer");
+    if (pe == null) throw new Exception("oCoopMazePeer not created");
+    pe.Visible = true; pe.Persistent = false;
+    Console.WriteLine("[apply] oCoopMazePeer visible");
     Console.WriteLine("[apply] oCoopNet persistent, events: " + string.Join(",", o.Events.Select((ev, i) => i + ":" + ev.Count)));
 }
