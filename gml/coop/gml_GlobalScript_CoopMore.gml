@@ -17,7 +17,7 @@ global.CoopArt = { tried: false, spr: {} };
 global.CoopB = { lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, dmgIn: 0, aggro: 0, pDeadSeen: false, meDeadSeen: false,
     botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapIn: 0, scrapOut: 0, logAt: 0 };
 global.CoopM = { sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
-    caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, botApproach: -1, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false,
+    caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
     logAt: 0, followed: false, shotAt: 0, targetLog: "" };
 global.CoopE = { pMoney: -1, pBuys: [], buysIn: 0, buysOut: 0, partnerEr: -1, botBuy: -1, botBuyDone: false, shown: 0 };
 global.CoopMore = { officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
@@ -36,6 +36,7 @@ function coop_more_parse_args()
         else if (_p == "-coop-botmazeapproach") { i++; _M.botApproach = real(_v); }
         else if (_p == "-coop-botmazeface") { i++; _M.botFace = real(_v); }
         else if (_p == "-coop-botmazeexit") { i++; _M.botExit = real(_v); }
+        else if (_p == "-coop-botmazespawn") { i++; _M.botSpawn = real(_v); }
         else if (_p == "-coop-botbuy") { i++; _E.botBuy = real(_v); }
         else if (_p == "-coop-botsettings") { i++; global.CoopMore.botSet = real(_v); }
         else if (_p == "-coop-mask") { i++; global.CoopCfg.mask = clamp(real(_v), 0, 2); global.CoopCfg.loaded = true; }
@@ -227,10 +228,20 @@ function coop_more_packet(_t, _m)
             coop_scrap_remove(_m.title);
             return true;
         case "mz": // partner maze position
-            _M.px = _m.x; _M.py = _m.y; _M.pdir = _m.d; _M.pmove = _m.mv; _M.pAlive = _m.al; _M.prm = _m.rm; _M.pAt = current_time;
+            _M.px = _m.x; _M.py = _m.y; _M.pdir = _m.d; _M.pmove = _m.mv; _M.pAlive = _m.al && !(current_time - _M.pCaughtAt < 2000); _M.prm = _m.rm; _M.pAt = current_time;
             return true;
         case "mzen": // client: host's enemy states
             _M.enemies = _m.e; _M.enemiesAt = current_time;
+            if (coop_is_client() && instance_exists(oCamera3DMaze) && !_M.meCaught && instance_number(oMazeEnemy) < array_length(_m.e))
+            {
+                // host's maze has enemies (e.g. the host took the Marionette mask): spawn puppets here
+                for (var i = instance_number(oMazeEnemy); i < array_length(_m.e); i++) { var _s = _m.e[i]; with (instance_create_depth(_s[0], _s[1], 0, oMazeEnemy)) { PatrolID = (array_length(_s) > 5) ? _s[5] : 0; } }
+                _M.puppets = instance_number(oMazeEnemy);
+                coop_log("MAZE: host has " + string(array_length(_m.e)) + " enemies -> puppets created here");
+            }
+            return true;
+        case "mzspawn": // host: the client's maze spawned enemies (client took the mask) -> spawn the real ones here
+            if (coop_is_host() && instance_exists(oCamera3DMaze) && instance_number(oMazeEnemy) == 0) { coop_maze_spawn_enemies("partner's maze spawned enemies"); }
             return true;
         case "mzgo": // client: follow host into the maze room
             if (coop_is_client() && global.CoopCfg.maze)
@@ -386,15 +397,34 @@ function coop_maze_hit()
     var _M = global.CoopM;
     if (!_M.sync) { return place_meeting(x, y, Player); }
     if (coop_is_client()) { return false; } // host decides catches
-    if (!_M.meCaught && place_meeting(x, y, oCamera3DMaze)) { return true; }
+    if (!_M.meCaught && place_meeting(x, y, oCamera3DMaze))
+    {
+        _M.meCaught = true;
+        if (_M.pAlive)
+        {
+            // keep the maze (and its enemies) running for the partner: I become a ghost until the partner leaves
+            _M.ghost = true;
+            coop_log("MAZE: enemy " + string(coop_maze_enemy_index(id)) + " caught ME (host) at " + string(round(x)) + "," + string(round(y)) + ", partner still in the maze -> ghost until partner leaves");
+            Mode = "Pause"; Frame = 0;
+            return false;
+        }
+        coop_log("MAZE: enemy " + string(coop_maze_enemy_index(id)) + " caught ME (host), partner already out/caught -> normal death");
+        return true;
+    }
     if (_M.pAlive && point_distance(x, y, _M.px, _M.py) < 14)
     {
-        _M.pAlive = false; _M.caughtP++;
+        _M.pAlive = false; _M.caughtP++; _M.pCaughtAt = current_time;
         coop_send({ t: "mzcaught", e: coop_maze_enemy_index(id) });
         coop_log("MAZE: enemy " + string(coop_maze_enemy_index(id)) + " caught the PARTNER at " + string(round(x)) + "," + string(round(y)));
         Mode = "Pause"; Frame = 0; Player = oCamera3DMaze;
     }
     return false;
+}
+
+function coop_maze_spawn_enemies(_why)
+{
+    with (oEnemySpawnPoint) { with (instance_create_depth(x, y, 0, oMazeEnemy)) { PatrolID = other.PatrolID; } }
+    coop_log("MAZE: spawned " + string(instance_number(oMazeEnemy)) + " enemies (" + _why + ")");
 }
 
 function coop_maze_enemy_index(_inst)
@@ -409,7 +439,7 @@ function coop_maze_step()
     var _inMaze = coop_is_maze_room(room) && instance_exists(oCamera3DMaze);
     var _pFresh = variable_struct_exists(_M, "pAt") && current_time - _M.pAt < 1500;
     _M.sync = _c.connected && global.CoopCfg.maze && _inMaze && _pFresh && _M.prm == room_get_name(room);
-    if (!_inMaze) { _M.meCaught = false; _M.pAlive = true; if (instance_exists(_M.peer)) { instance_destroy(_M.peer); } _M.peer = noone; }
+    if (!_inMaze) { _M.ghost = false; _M.ghostDone = false; _M.meCaught = false; _M.pAlive = true; _M.spawnSent = false; _M.puppets = 0; _M.botSpawnDone = false; if (instance_exists(_M.peer)) { instance_destroy(_M.peer); } _M.peer = noone; }
     // host pulls the partner into its maze room
     if (coop_is_host() && _c.connected && global.CoopCfg.maze && _inMaze && current_time - _M.lastSend > 1000 && !(_pFresh && _M.prm == room_get_name(room)))
     {
@@ -423,7 +453,11 @@ function coop_maze_step()
         var _cam = oCamera3DMaze;
         coop_send({ t: "mz", x: _cam.x, y: _cam.y, d: _cam.CameraRotationH + 180, mv: (_cam.Loudness > 0) ? 1 : 0, al: !_M.meCaught && !instance_exists(oMinigameJumpscare), rm: room_get_name(room) });
     }
+    // host ghost: run the normal death once the partner is out of the maze or caught
+    if (_M.ghost && !_M.ghostDone && (!_M.sync || !_M.pAlive)) { _M.ghostDone = true; coop_maze_die_local("deferred: partner out of the maze or caught"); }
     if (!_M.sync) { return; }
+    // client got its own enemies (it took the mask): ask the host to spawn the real ones
+    if (coop_is_client() && !_M.spawnSent && instance_number(oMazeEnemy) > _M.puppets) { _M.spawnSent = true; coop_send({ t: "mzspawn" }); coop_log("MAZE: my maze spawned enemies -> host spawns the real ones"); }
     // partner billboard object (draws in the 3D pass)
     if (!instance_exists(_M.peer)) { _M.peer = instance_create_depth(_M.px, _M.py, 0, oCoopMazePeer); coop_log("MAZE: partner billboard created at " + string(round(_M.px)) + "," + string(round(_M.py))); }
     with (_M.peer) { x = _M.px; y = _M.py; Loudness = _M.pmove ? 512 : 0; visible = _M.pAlive; }
@@ -437,7 +471,7 @@ function coop_maze_step()
             var _dP = global.CoopM.pAlive ? point_distance(x, y, global.CoopM.px, global.CoopM.py) : 999999;
             var _nt = (_dP < _dMe) ? global.CoopM.peer : oCamera3DMaze;
             if (Player != _nt) { Player = _nt; global.CoopM.targetLog = "enemy " + string(coop_maze_enemy_index(id)) + " -> " + ((_nt == oCamera3DMaze) ? "HOST" : "PARTNER") + " (dHost " + string(round(_dMe)) + ", dPartner " + string(round(_dP)) + ")"; coop_log("MAZE: target " + global.CoopM.targetLog); }
-            array_push(_list, [round(x * 10) / 10, round(y * 10) / 10, Mode, round(Direction), round(AnimFrame)]);
+            array_push(_list, [round(x * 10) / 10, round(y * 10) / 10, Mode, round(Direction), round(AnimFrame), PatrolID]);
         }
         if (current_time - _M.lastEnemySend >= 100) { _M.lastEnemySend = current_time; coop_send({ t: "mzen", e: _list }); }
     }
@@ -469,14 +503,55 @@ function coop_maze_endstep()
     for (var i = 0; i < _n; i++) { var _e = instance_find(oMazeEnemy, i), _s = _M.enemies[i]; with (_e) { x = _s[0]; y = _s[1]; } }
 }
 
-// leaving the maze first: wait (office paused) until the partner leaves too
+// leaving the maze first (escaped, quit or caught): wait in SalvageResults (office paused) until the partner leaves too
+function coop_partner_in_maze()
+{
+    var _M = global.CoopM;
+    return global.Coop.connected && variable_struct_exists(_M, "pAt") && current_time - _M.pAt < 1500 && string_pos("MinigameMaze_", _M.prm) == 1;
+}
+
+// oSalvageSheet Create in SalvageResults: true = don't go to the next night yet
+function coop_maze_hold()
+{
+    var _M = global.CoopM;
+    if (!global.CoopCfg.maze || !coop_partner_in_maze()) { return false; }
+    _M.waitShown = true; _M.waitAt = current_time;
+    coop_log("MAZE: out of the maze first -> waiting for partner (night not advanced yet)");
+    return true;
+}
+
 function coop_maze_wait_step()
 {
-    var _c = global.Coop, _M = global.CoopM;
-    if (!_c.connected || !global.CoopCfg.maze) { return; }
-    var _pm = string_pos("MinigameMaze_", coop_partner_get("rm", "")) == 1 && current_time - _c.partnerSnapAt < 3000;
-    if (room == SalvageResults && _pm) { if (instance_exists(oSalvageSheet)) { instance_deactivate_object(oSalvageSheet); if (!_M.waitShown) { _M.waitShown = true; coop_log("MAZE: out of the maze first -> waiting for partner (office paused)"); } } }
-    else if (room == SalvageResults && _M.waitShown) { instance_activate_object(oSalvageSheet); _M.waitShown = false; coop_log("MAZE: partner left the maze -> continue"); }
+    var _M = global.CoopM;
+    if (room != SalvageResults || !_M.waitShown) { return; }
+    if (!coop_partner_in_maze() && current_time - _M.waitAt > 500)
+    {
+        _M.waitShown = false;
+        coop_log("MAZE: partner left the maze -> continue (as oSalvageSheet does)");
+        global.Night++; global.StartRoom = NightOpening; create_save(); room_goto(NightOpening); window_set_cursor(cr_default);
+    }
+}
+
+function coop_bot_textbox_forward()
+{
+    with (oTextBox)
+    {
+        if (ExternalPause || Delay[TextPage] != 0 || Lock[TextPage]) { continue; }
+        if (TextDrawChar != TextLength[TextPage]) { TextDrawChar = TextLength[TextPage]; continue; }
+        if (TextPage < (TextPageNumber - 1))
+        {
+            if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; initialize(); game_text(_dst); }
+            TextPage += 1; TextDrawChar = 0;
+            if (is_callable(Function[TextPage])) { Function[TextPage](); }
+            if (array_length(CGPFunction) > 0 && TextPage < array_length(CGPFunction))
+            {
+                var _f = CGPFunction[TextPage];
+                if (array_length(_f) == 1) { _f[0](); } else if (array_length(_f) > 1) { _f[0](_f[1]); }
+            }
+            Frame = 0;
+        }
+        else { instance_destroy(); }
+    }
 }
 
 // oCoopMazePeer Draw (3D pass, same billboard method as oMazeEnemy)
@@ -619,6 +694,8 @@ function coop_more_bot()
         coop_log("bot: FORCED room jump to " + room_get_name(_rooms[_M.botMaze - 1]) + " (night " + string(_M.botMaze) + ")");
         room_goto(_rooms[_M.botMaze - 1]);
     }
+    // maze dialogs (FLAGGED: the bot "presses" forward like input_check_pressed(0) in oTextBox.draw_everything)
+    if (_M.botMaze >= 0 || _M.botFace >= 0 || _M.botApproach >= 0) { if (coop_is_maze_room(room) && instance_exists(oTextBox) && current_time - _M.botTxtAt > 700) { _M.botTxtAt = current_time; coop_bot_textbox_forward(); } }
     if (_M.sync && instance_exists(oCamera3DMaze) && !instance_exists(oTextBox))
     {
         var _t = oCamera3DMaze.Frame; // not a clock; use time in room
@@ -629,17 +706,18 @@ function coop_more_bot()
         {
             _M.botFaceDone = true;
             var _hd = _M.pdir;
-            oCamera3DMaze.x = _M.px + lengthdir_x(56, _hd); oCamera3DMaze.y = _M.py + lengthdir_y(56, _hd);
+            oCamera3DMaze.x = _M.px + lengthdir_x(120, _hd); oCamera3DMaze.y = _M.py + lengthdir_y(120, _hd);
             oCamera3DMaze.CameraRotationH = _hd; // face the host (look dir = rot + 180)
-            coop_log("bot: FORCED teleport in front of the host (56 px) for the billboard shot");
+            coop_log("bot: FORCED teleport in front of the host (120 px) for the billboard shot");
             global.CoopMore.shotReq = "maze_billboard"; global.CoopMore.shotAt = current_time + 2500;
         }
         // client walks to the nearest enemy (FLAGGED teleport next to it), host's enemy must switch to the partner and catch it
-        if (_M.botApproach >= 0 && coop_is_client() && !_M.botApproachDone && _sec >= _M.botApproach && !_M.meCaught)
+        if (_M.botApproach >= 0 && coop_is_client() && !_M.botApproachDone && _sec >= _M.botApproach && !_M.meCaught && instance_number(oMazeEnemy) > 0)
         {
             var _ne = instance_nearest(oCamera3DMaze.x, oCamera3DMaze.y, oMazeEnemy);
             if (_ne != noone) { _M.botApproachDone = true; oCamera3DMaze.x = _ne.x + 40; oCamera3DMaze.y = _ne.y; coop_log("bot: FORCED teleport 40 px from enemy at " + string(round(_ne.x)) + "," + string(round(_ne.y))); }
         }
+        if (_M.botSpawn >= 0 && coop_is_host() && !_M.botSpawnDone && _sec >= _M.botSpawn && instance_number(oMazeEnemy) == 0) { _M.botSpawnDone = true; coop_maze_spawn_enemies("bot: FORCED, as TakeMask does, without the palette/wall change"); }
         if (_M.botExit >= 0 && coop_is_host() && !_M.botExitDone && _sec >= _M.botExit)
         {
             _M.botExitDone = true;
@@ -687,10 +765,12 @@ function coop_more_draw()
     }
     if (coop_is_maze_room(room) && _c.connected)
     {
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(4, 4, 190, 22, false); draw_set_alpha(1);
-        coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 6, 5, 1);
+        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(4, 24, 190, 42, false); draw_set_alpha(1);
+        coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 6, 25, 1);
         draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
-        draw_text(26, 6, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(oCamera3DMaze.x, oCamera3DMaze.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
+        if (_M.ghost && !_M.ghostDone) { draw_set_color(c_red); draw_text(6, 46, "CAUGHT - you are a ghost until your partner leaves the maze"); }
+        draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
+        draw_text(26, 26, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(oCamera3DMaze.x, oCamera3DMaze.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
         draw_set_color(c_white);
     }
     if (room == SalvageResults && _M.waitShown)

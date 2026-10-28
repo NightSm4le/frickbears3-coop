@@ -51,6 +51,7 @@ if (stage == "full")
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function win_night()\n{", "function win_night()\n{\n    coop_on_win_night();");
     // 0.6.0: maze co-op (host decides catches, enemy hunts the nearest living player), partner purchases
     g.QueueFindReplace("gml_Object_oMazeEnemy_Step_0", "if (place_meeting(x, y, Player))\n{\n    var NearestPoint = self;", "if (coop_maze_hit())\n{\n    var NearestPoint = self;");
+    g.QueueFindReplace("gml_Object_oSalvageSheet_Create_0", "if (room == SalvageResults)\n{\n    global.Night++;", "if (room == SalvageResults && !coop_maze_hold())\n{\n    global.Night++;");
     g.QueueFindReplace("gml_GlobalScript_UpgradeData", "function acquire_upgrade(arg0)\n{", "function acquire_upgrade(arg0)\n{\n    try { coop_on_upgrade(arg0); } catch (_coopErr) { }");
     // stage 3: shared animatronics
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function jumpscare(arg0, arg1 = 0, arg2 = 0, arg3 = true, arg4 = true)\n{",
