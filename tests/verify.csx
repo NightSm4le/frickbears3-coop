@@ -10,7 +10,7 @@ if (stage == "full")
 {
     var o = Data.GameObjects.ByName("oCoopNet");
     need(o != null && o.Persistent, "oCoopNet missing/not persistent");
-    foreach (var n in new[] { "gml_GlobalScript_CoopNet", "gml_Object_oCoopNet_Create_0", "gml_Object_oCoopNet_Step_0", "gml_Object_oCoopNet_Other_68", "gml_Object_oCoopNet_Draw_64" })
+    foreach (var n in new[] { "gml_GlobalScript_CoopNet", "gml_Object_oCoopNet_Create_0", "gml_Object_oCoopNet_Step_0", "gml_Object_oCoopNet_Other_68", "gml_Object_oCoopNet_Draw_75" })
         need(Data.Code.ByName(n) != null, n + " missing");
     var dec = new Underanalyzer.Decompiler.DecompileContext(new UndertaleModLib.Decompiler.GlobalDecompileContext(Data), Data.Code.ByName("gml_GlobalScript_SaveData"), Data.ToolInfo.DecompilerSettings).DecompileToString();
     need(dec.Split("coop_block_save").Length - 1 == 3, "save guards != 3");

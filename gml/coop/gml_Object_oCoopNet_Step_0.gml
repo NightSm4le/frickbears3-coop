@@ -37,8 +37,16 @@ if (_c.connected && room == Office && keyboard_check_pressed(ord("P"))) { coop_s
 if (_c.bot)
 {
     BotTimer++;
-    if (BotTimer mod 60 == 0) { coop_log(coop_bot_line()); }
+    if (BotTimer mod 60 == 0) { coop_log(coop_bot_line() + " draws=" + string(DrawCount) + " gui=" + string(display_get_gui_width()) + "x" + string(display_get_gui_height())); }
     if (_c.botPing && _c.connected && room == Office && BotTimer mod 150 == 0) { coop_send_ping(); }
+    if (_c.botDoors >= 0 && !BotDoorsDone && room == Office && variable_global_exists("Timer") && variable_global_exists("Doors") && global.Timer >= _c.botDoors)
+    {
+        BotDoorsDone = true;
+        global.Doors[0] = 1;
+        global.Doors[1] = 1;
+        audio_play_sound(sfxDoor, 10, false);
+        coop_log("bot: closed both doors at timer " + string(global.Timer));
+    }
     if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && global.Timer >= _c.botWin)
     {
         BotWinDone = true;

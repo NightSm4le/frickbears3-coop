@@ -7,5 +7,7 @@ BotTimer = 0;
 AutoNightDone = false;
 BotSkippedWarning = false;
 BotWinDone = false;
+BotDoorsDone = false;
+DrawCount = 0;
 IpText = _c.ip;
 PortText = string(_c.port);

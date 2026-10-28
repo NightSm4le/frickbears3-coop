@@ -27,7 +27,7 @@ if (stage == "full")
 {
     // spawn the persistent network object from the persistent game manager (StartupRoom)
     g.QueueAppend("gml_Object_oSuperGameManager_Create_0",
-        "\nif (!instance_exists(oCoopNet)) { instance_create_depth(0, 0, -16000, oCoopNet); }\n");
+        "\nif (!instance_exists(oCoopNet)) { instance_create_depth(0, 0, -10000, oCoopNet); }\n");
     // client never writes progress saves (savedata / records / endless)
     foreach (var fn in new[] { "create_save", "save_permanent_data", "save_endless_data" })
     {

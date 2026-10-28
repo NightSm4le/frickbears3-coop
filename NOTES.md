@@ -35,7 +35,43 @@ Menu: F8 outside Office: IP/Port fields (click, type, Tab), HOST / JOIN / LEAVE,
 - `mod` can't be a struct field name (keyword).
 - `async_load[? "k"]` decompiled as plain `["k"]` -> used ds_map_find_value explicitly; struct `[$ ]` -> variable_struct_get. Unknown identifiers would compile as variables silently: check decompile dump.
 
-## NOT yet verified by running (needs Wine, being installed by another worker)
+## Wine run results (2026-10-28, wine-10.0, Xvfb :99, build sha 9e6f42cf…)
+- log build: coop_boot.log appears — PASS.
+- full pair (runA host `-coop-host -coop-bot -coop-autonight 1 -coop-botdoors 8`, runB client `-coop-join -coop-bot -coop-botping -coop-botwin 30`):
+  connect PASS (rtt 14–137 ms), both in Office night 1 PASS, clock diff 0.00–0.14 s PASS,
+  separate power PASS (host 98.68/87.48 with doors closed, client 100), client save block PASS
+  (client forced win_night; "save blocked on client" logged; save files sha256 unchanged, host never won).
+- stage 2: snap ~10/s (966 snaps / ~95 s), partner HUD (PWR bar, L/R doors red when closed, CAM/OFFICE/MASK, FAN/LIGHT/T, DEAD), ping P (1 s cooldown, sfxBitCollect + 2 s PING! flash) PASS. Sound call not audible in Xvfb.
+- screenshots: ../qa/host.png client.png hud.png menu.png
+
+## Fixes found by running
+- WarningScreen stalls bots: bot skips it (apply_settings(false); room_goto(TitleScreenMap)).
+- oPauser/oPersistentPauser paused on focus loss + instance_deactivate_all -> host froze. In coop: no focus autopause; oCoopNet re-activated on pause.
+  LIMITATION: manual pause on host still stops the shared clock (todo: pause = local only, or pause both).
+- GUI invisible: game enables z-test; draw in Draw GUI End (Draw_75) with ztest/zwrite off, depth -10000.
+- Both copies share one save dir under a single WINEPREFIX -> test save isolation by hash; restore from qa/save_backup.
+- Bot flags: -coop-bot, -coop-autonight N, -coop-botping, -coop-botwin N, -coop-botdoors N (xdotool input into Wine game is unreliable).
+- Todo small: partner HUD shows "?" after partner reaches NightClear -> show "SURVIVED 6AM".
+
+## Protocol additions (stage 2)
+- "snap" every 100 ms: rm alive pw d0 d1 cu cam mk fan fl tp tm (receiver computes clockDiff = Timer - tm).
+- "alert": ping, 1 s cooldown.
+
+## Stage 3 (NEXT, after stage 2): SHARED ANIMATRONICS
+Rule: one animatronic for both. If Bonnie is attacking / at the door of one player, he cannot attack the other at that moment.
+- Host-authoritative "attack token" per animatronic. Intercept points: DoorOccupant / doorway_available / occupy_doorway (SimpleScripts)
+  and each animatronic's attack/move step. Before occupying a doorway or starting an attack -> "claim" {anim}; host grants if free -> "grant"/"deny";
+  on retreat/jumpscare/night end -> "release". Non-owner: AI frozen or reset to start position (keeps move-timer RNG local).
+- Timeouts: token auto-released after N s without heartbeat (disconnect safety).
+Promised related mechanics:
+1. Repelled animatronic (e.g. Foxy) may run to partner's office + warning on partner's HUD ("FOXY -> YOU").
+2. Shared generator: doors closed long on one side add a small extra to Usage for both (hook in oCamera_Step_0 Usage sum; send doorClosedTime in snap).
+3. Vent animatronic picks the office whose cameras are off (cu=0 from snap) — host decides.
+4. Sound lure at home can pull an animatronic out of partner's office (lure event -> host moves token holder).
+5. If one player dies, the killer animatronic becomes more aggressive for the survivor (AILevels[x] += k on survivor).
+Night win: night passes for both if at least one survives to 6 AM (spectator mode, no Lives spent).
+
+## Not yet verified by running
 - game boots with log/full builds; coop_boot.log appears; oCoopNet spawns and survives rooms.
 - GM framed TCP through Porthole; network_connect_async on Win runner under Wine.
 - night follow on client (global.Night alone may be insufficient for story nights / Custom Night setup), -coop-autonight path.
