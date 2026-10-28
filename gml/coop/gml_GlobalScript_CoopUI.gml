@@ -129,7 +129,7 @@ function coop_draw_overlay()
     // key hint for the first seconds of a night
     if (current_time < global.CoopS.hintUntil && coop_alive())
     {
-        var _ht = "CO-OP: P ping  G give 10% power  H/J close partner's L/R door  L lure partner's cams  Tab hide  F9 move";
+        var _ht = "CO-OP: P ping  G give 10% power  H warn partner  L lure on partner's cams  Tab hide  F9 move";
         var _hw = string_width(_ht) + 10;
         draw_set_alpha(0.5); draw_set_color(c_black); draw_rectangle(_gw / 2 - _hw / 2, _gh - 64, _gw / 2 + _hw / 2, _gh - 50, false);
         draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh - 63, _ht); draw_set_halign(fa_left); draw_set_alpha(1);

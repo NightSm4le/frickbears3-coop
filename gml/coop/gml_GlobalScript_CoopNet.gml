@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 2,
-    modver: "0.4.0",
+    modver: "0.4.1",
     mode: "off",          // off | host | client
     server: -1,
     sock: -1,             // client: own socket, host: partner socket
@@ -370,6 +370,7 @@ function coop_draw_gui()
     // --- stage 4: spectator view replaces the death screen; the alive side streams frames ---
     if (global.CoopS.spec && room == GameOver) { coop_spec_draw(); return; }
     coop_stream_tick();
+    coop_warn_draw();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
     if (room == Office && _c.connected) { coop_draw_overlay(); }
     if (!_c.menuOpen) { return; }

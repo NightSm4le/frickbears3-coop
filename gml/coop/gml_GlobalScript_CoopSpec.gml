@@ -5,7 +5,7 @@
 // with adaptive size/rate driven by acks (works through a Porthole relay: slower acks -> smaller/rarer frames).
 // Partner reaches 6 AM -> win_night() here too (normal progress on the host). Partner dies too -> the
 // skipped death is counted now and the real GameOver screen appears for both.
-// Help: G = give 10% power, H/J = close partner's left/right door for 8 s (paid with my power),
+// Help: G = give 10% power, H = warn partner (flash where their threat is; free, cd 20 s),
 // L = remote audio lure in partner's office. Small native buttons under the mini-window do the same.
 
 global.CoopS = {
@@ -16,9 +16,9 @@ global.CoopS = {
     capSurf: -1, seq: 0, ackSeq: 0, sentAt: array_create(64, 0), level: 2, lastSend: -100000, lastAdapt: 0,
     lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 96, sending: false,
     // help
-    cdGive: -100000, cdDoor: -100000, cdLure: -100000, rdUntil: [0, 0], hintUntil: 0,
+    cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0,
     botHelp: -1, botHelpStep: 0, botHelpAt: 0, botDie: -1, botDieDone: false, shotPend: "", shotAt: 0, specShot: false, btnShot: false,
-    st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, door: 0, lure: 0, giveIn: 0, doorIn: 0, lureIn: 0, refunds: 0 }
+    st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, warn: 0, lure: 0, giveIn: 0, warnIn: 0, lureIn: 0, refunds: 0 }
 };
 // [w, h, interval ms]
 #macro COOP_LV [[256, 144, 200], [192, 108, 250], [160, 90, 333], [128, 72, 500], [96, 54, 1000]]
@@ -259,7 +259,7 @@ function coop_help_key_free(_k)
 
 function coop_help_power_max() { return (instance_exists(oCamera) && variable_instance_exists(oCamera, "MaxPower")) ? oCamera.MaxPower : 100; }
 
-// _what: "give" | "door0" | "door1" | "lure"; returns true if sent
+// _what: "give" | "warn" | "lure"; returns true if sent
 function coop_help_do(_what, _src)
 {
     var _s = global.CoopS;
@@ -275,12 +275,11 @@ function coop_help_do(_what, _src)
             coop_send({ t: "give", amt: 10 });
             coop_alert("Sent 10% power to partner", c_lime, sfxBitCollect);
             break;
-        case "door0": case "door1":
-            if (_now < _s.cdDoor) { coop_alert("Partner door: cooldown " + string(ceil((_s.cdDoor - _now) / 1000)) + "s", c_gray, undefined); return false; }
-            if (global.Power < 8) { coop_alert("Partner door: need 8%+", c_gray, undefined); return false; }
-            global.Power -= 6; _s.cdDoor = _now + 15000; _s.st.door++;
-            coop_send({ t: "door", side: (_what == "door1") ? 1 : 0, dur: 8000 });
-            coop_alert("Closing partner's " + ((_what == "door1") ? "RIGHT" : "LEFT") + " door (8s, -6% power)", c_lime, sfxDoor);
+        case "warn":
+            if (_now < _s.cdWarn) { coop_alert("Warn: cooldown " + string(ceil((_s.cdWarn - _now) / 1000)) + "s", c_gray, undefined); return false; }
+            _s.cdWarn = _now + 20000; _s.st.warn++;
+            coop_send({ t: "warn" });
+            coop_alert("Warning sent to partner (they see where the threat is)", c_lime, undefined);
             break;
         case "lure":
             if (_now < _s.cdLure) { coop_alert("Remote lure: cooldown " + string(ceil((_s.cdLure - _now) / 1000)) + "s", c_gray, undefined); return false; }
@@ -312,14 +311,13 @@ function coop_help_packet(_t, _m)
             coop_log("help: got power " + string(_old) + " -> " + string(global.Power));
             if (_got < _m.amt) { coop_send({ t: "helpack", what: "give", ok: 0, amt: _m.amt - _got }); }
             return true;
-        case "door":
-            _s.st.doorIn++;
-            var _sd = _m.side;
-            if (room != Office || !coop_alive() || global.Doors[_sd]) { coop_send({ t: "helpack", what: "door", ok: 0 }); coop_log("help: partner door " + string(_sd) + " ignored (already closed / not in office)"); return true; }
-            global.Doors[_sd] = 1; _s.rdUntil[_sd] = current_time + _m.dur;
-            audio_play_sound(sfxDoor, 10, false);
-            coop_alert("Partner closed your " + (_sd ? "RIGHT" : "LEFT") + " door (" + string(_m.dur div 1000) + "s, their power)", c_lime, undefined);
-            coop_log("help: partner closed my door " + string(_sd) + " for " + string(_m.dur) + "ms");
+        case "warn":
+            _s.st.warnIn++;
+            if (room != Office || !coop_alive()) { return true; }
+            var _w = coop_warn_threat();
+            _s.warnWhere = _w[0]; _s.warnName = _w[1]; _s.warnUntil = current_time + 2800;
+            audio_play_sound(sfxError, 10, false);
+            coop_log("help: partner warned me -> threat " + _w[0] + " (" + _w[1] + ")");
             return true;
         case "rlure":
             _s.st.lureIn++;
@@ -333,7 +331,7 @@ function coop_help_packet(_t, _m)
             if (!_m.ok)
             {
                 _s.st.refunds++;
-                var _ref = (_m.what == "give") ? _m.amt : ((_m.what == "door") ? 6 : 0);
+                var _ref = (_m.what == "give") ? _m.amt : 0;
                 if (room == Office) { global.Power += _ref; }
                 coop_alert("Help not needed (" + _m.what + "), refunded " + string(round(_ref)) + "%", c_gray, undefined);
                 coop_log("help: " + _m.what + " refused by partner, refund " + string(_ref));
@@ -343,37 +341,71 @@ function coop_help_packet(_t, _m)
     return false;
 }
 
-// usage compensation: a door held closed by the partner does not drain my power
-function coop_help_usage_comp()
+// usage compensation (door help removed in 0.4.1)
+function coop_help_usage_comp() { return 0; }
+
+// where is the nearest threat in MY office? -> [where ("L"|"R"|"V"|"CLEAR"), name]
+function coop_warn_threat()
 {
-    var _s = global.CoopS, _x = 0;
-    for (var i = 0; i < 2; i++) { if (_s.rdUntil[i] > 0 && global.Doors[i]) { _x -= 1; } }
-    return _x;
+    var _a = global.CoopA;
+    for (var s = 0; s < 2; s++) { if (global.DoorOccupant[s] >= 0) { return [s ? "R" : "L", coop_anim_name(global.DoorOccupant[s])]; } }
+    for (var n = 0; n < array_length(_a.ids); n++)
+    {
+        var _i = coop_anim_inst(_a.ids[n]);
+        if (_i == noone) { continue; }
+        var _k = coop_anim_kind(_i), _near = false;
+        if (_k == "stage") { _near = _i.Stage == "Hallway" || _i.Stage == "TransitionC" || _i.Stage == "Doorway"; }
+        else if (_k == "vent") { _near = _i.Mode != "Vents" || _i.VentY >= 1; }
+        else if (_k == "foxy") { _near = _i.Mode == "Run" || _i.Phase > _i.WaitTime * 0.6; }
+        if (!_near) { continue; }
+        var _w = "V";
+        if (_k != "vent") { _w = (variable_instance_exists(_i, "Side") && _i.Side > 0) ? "R" : "L"; }
+        return [_w, coop_anim_name(_a.ids[n])];
+    }
+    return ["CLEAR", ""];
+}
+
+// flashing marker in my office after a partner's warning (GUI 640x360): steady 1.6 s, then blinking
+function coop_warn_draw()
+{
+    var _s = global.CoopS;
+    if (room != Office || current_time > _s.warnUntil) { return; }
+    if (_s.warnUntil - current_time < 1200 && (current_time div 150) mod 2) { return; }
+    var _w = display_get_gui_width(), _h = display_get_gui_height();
+    draw_set_font(-1); draw_set_halign(fa_center); draw_set_valign(fa_middle);
+    if (_s.warnWhere == "CLEAR")
+    {
+        draw_set_color(c_lime);
+        for (var i = 0; i < 3; i++) { draw_rectangle(_w / 2 - 80 + i, _h / 2 - 16 + i, _w / 2 + 80 - i, _h / 2 + 16 - i, true); }
+        draw_text(_w / 2, _h / 2, "PARTNER: ALL CLEAR");
+    }
+    else
+    {
+        draw_set_color(c_red);
+        var _lab = "PARTNER: " + string_upper(_s.warnName);
+        if (_s.warnWhere == "L") { for (var i = 0; i < 4; i++) { draw_rectangle(i, 40 + i, 60 - i, _h - 40 - i, true); } draw_triangle(100, _h / 2 - 20, 100, _h / 2 + 20, 66, _h / 2, false); draw_text(190, _h / 2, "<< " + _lab); }
+        else if (_s.warnWhere == "R") { for (var i = 0; i < 4; i++) { draw_rectangle(_w - 60 + i, 40 + i, _w - 1 - i, _h - 40 - i, true); } draw_triangle(_w - 100, _h / 2 - 20, _w - 100, _h / 2 + 20, _w - 66, _h / 2, false); draw_text(_w - 190, _h / 2, _lab + " >>"); }
+        else { for (var i = 0; i < 4; i++) { draw_rectangle(_w / 2 - 120 + i, 30 + i, _w / 2 + 120 - i, 70 - i, true); } draw_text(_w / 2, 84, "VENT: " + _lab); }
+    }
+    draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(c_white);
 }
 
 // oCoopNet Step (Office)
 function coop_help_step()
 {
     var _s = global.CoopS, _c = global.Coop;
-    if (room != Office) { _s.rdUntil = [0, 0]; return; }
-    for (var i = 0; i < 2; i++)
-    {
-        if (_s.rdUntil[i] <= 0) { continue; }
-        if (!global.Doors[i]) { _s.rdUntil[i] = 0; coop_log("help: door " + string(i) + " opened by me before timeout"); }
-        else if (current_time > _s.rdUntil[i]) { _s.rdUntil[i] = 0; global.Doors[i] = 0; audio_play_sound(sfxDoor, 10, false); coop_log("help: partner door hold on " + string(i) + " ended"); }
-    }
+    if (room != Office) { return; }
     if (!_c.connected || !coop_alive()) { return; }
     if (variable_global_exists("DevMode") && global.DevMode) { return; }
     if (keyboard_check_pressed(ord("G")) && coop_help_key_free(ord("G"))) { coop_help_do("give", "key G"); }
-    if (keyboard_check_pressed(ord("H")) && coop_help_key_free(ord("H"))) { coop_help_do("door0", "key H"); }
-    if (keyboard_check_pressed(ord("J")) && coop_help_key_free(ord("J"))) { coop_help_do("door1", "key J"); }
+    if (keyboard_check_pressed(ord("H")) && coop_help_key_free(ord("H"))) { coop_help_do("warn", "key H"); }
     if (keyboard_check_pressed(ord("L")) && coop_help_key_free(ord("L"))) { coop_help_do("lure", "key L"); }
     // bot: fire each help action in turn
     if (_s.botHelp >= 0 && global.Timer >= _s.botHelp && _s.botHelpStep < 4 && current_time - _s.botHelpAt > 16000 && coop_partner_alive_in_office())
     {
         _s.botHelpAt = current_time;
         if (!_s.btnShot) { _s.btnShot = true; coop_log("SHOT help_buttons"); return; }
-        var _acts = ["give", "door0", "lure", "door1"];
+        var _acts = ["give", "warn", "lure", "warn"];
         coop_log("bot: help " + _acts[_s.botHelpStep]);
         coop_help_do(_acts[_s.botHelpStep], "bot");
         _s.botHelpStep++;
@@ -383,17 +415,17 @@ function coop_help_step()
 // button rects under the mini-window (only in compact mode): [x1, y1, x2, y2, action, label]
 function coop_help_buttons(_px, _py, _w)
 {
-    var _bw = (_w - 3 * 2) / 4, _y1 = _py + 32, _y2 = _py + 43;
+    var _bw = (_w - 2 * 2) / 3, _y1 = _py + 32, _y2 = _py + 43;
     var _r = [];
-    var _def = [["give", "G+pw"], ["door0", "H<dr"], ["door1", "J dr>"], ["lure", "L lure"]];
-    for (var i = 0; i < 4; i++) { var _x1 = _px + i * (_bw + 2); array_push(_r, [_x1, _y1, _x1 + _bw, _y2, _def[i][0], _def[i][1]]); }
+    var _def = [["give", "G+pw"], ["warn", "H !"], ["lure", "L lure"]];
+    for (var i = 0; i < 3; i++) { var _x1 = _px + i * (_bw + 2); array_push(_r, [_x1, _y1, _x1 + _bw, _y2, _def[i][0], _def[i][1]]); }
     return _r;
 }
 
 function coop_help_cd_of(_act)
 {
     var _s = global.CoopS;
-    switch (_act) { case "give": return _s.cdGive; case "lure": return _s.cdLure; default: return _s.cdDoor; }
+    switch (_act) { case "give": return _s.cdGive; case "lure": return _s.cdLure; default: return _s.cdWarn; }
 }
 
 // Begin Step: a click exactly on a help button is used and cleared; every other click goes to the game

@@ -100,3 +100,29 @@ Build: sha256 704cb413b9f4a190220ded828b02b6f8c2dff29b228f49f3b0b516e9cfdd0248, 
 - Runs: qa/stage4_run{2..6}_{host,client}.log (run1 crashed on builtin `fps` name, artefacts removed).
 - Limitations: relay lag simulated (botlag); xdotool clicks don't reach the game under Wine (button path untested by real input);
   remote lure only verified as delivered (no active animatronic near on test nights); Endless mode lives untested.
+
+## 0.4.1 — H warn replaces door help (2026-10-28)
+Door help (H/J close partner's door) REMOVED. H = warn partner: free, cd 20 s; partner sees for 2.8 s a red edge frame+arrow at L/R door,
+"VENT: name" box, or "PARTNER: ALL CLEAR" (coop_warn_threat: DoorOccupant first, then near-by-kind). J is free. Buttons "G+pw" "H !" "L lure".
+Build d69818939bdb08ec555e8e0a9680b582e9a66c71d6d0f12e2e93813bf076bf7f VERIFY OK. Test run7: warn PASS (client "threat L (Bonnie)", qa/help_warn.png),
+give+refund PASS, spectator win PASS. qa/help_door*_OBSOLETE.png = old door help. Lure with active AI: still not proven (host died to Foxy first).
+
+## Stage 5 (A) — sprite SKETCHES only, not in data.win
+art/make_sprites.py (16x32 guard pixel maps in GB palette D(0,47,51) M(52,104,86) L(136,192,112) H(224,248,208), P1 blue / P2 orange accents,
+4 dirs x (idle+2 walk), 32x64 billboard via scale2x, 16x16 icons head/ping/dead, 48x48 portraits), make_sheet.py -> qa/sprites_sheet.png,
+make_mock.py -> qa/sprites_mock.png. References: sMinigamePlayer (16x32 f16), sTitleTex_GuardSilhouettes, sCustomNightGuardFaces, sMazeFreddy.
+
+## Stage C — test package (release_src/, output /workspace/frickbears/release/FB3-Coop-test.zip, no game files)
+make_release.sh: official xdelta3 3.1.0 exe (GPG-verified, sha 6855c01c…) under Wine creates fb3coop.xdelta clean->build; install.ps1 (BOM) checks
+hashes of xdelta3/patch/source data.win, copies game to sibling frickbears3-coop[-N], patches only copy, verifies output sha, re-checks source.
+Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy — see qa/installer_test.txt. install.bat path / Windows PS 5.1 untested.
+
+## LATER (user notes, do not do yet)
+- Sprites: players in animatronic masks, game pixel style, P1/P2 different colors; always 2–3 drafts first, final only after approval.
+- Stage 7: host sets one difficulty for both; money/upgrades per player, shop shows partner's purchases; night reward for both incl. spectator;
+  co-op progress in a SEPARATE save per player, normal saves untouched.
+- Co-op settings screen (host, game style), sent in welcome, applies to both, stored in separate co-op config: wallet shared/separate (default separate);
+  spectator reward full/50%/0; revives off/1/2 per night; toggles: animatronic crossover, shared generator, "both hold the door" event,
+  vent animatronic chooses office without cameras; survivor killer-rage weak/normal/strong.
+- Approved features queue: camera marks (~8 s, also spectator), revive (once/night, 3 s hold, reviver vulnerable), joint "both hold the door" event
+  (host, warning, 3 s window), night score at 6 AM/GameOver, shared boss HP (analysis first). Stage 6: 3D co-op in MinigameMaze_1.

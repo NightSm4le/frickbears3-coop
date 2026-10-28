@@ -1,0 +1,7 @@
+xdelta3.exe = xdelta3-3.1.0-x86_64.exe from the official release
+https://github.com/jmacd/xdelta-gpl/releases/tag/v3.1.0  (file xdelta3-3.1.0-x86_64.exe.zip)
+zip sha256 b10e0d1df3e212e5a2d37d5c088d2f72ecec760bc3c26caeca51499c3118b93a
+exe sha256 6855c01cf4a1662ba421e6f95370cf9afa2b3ab6c148473c63efe60d634dfb9a
+GPG: Good signature from Josh MacDonald, key B563 15DB 06EC 0C6F AC7C 60E2 2B9E D4DF 0ABF B111
+License: GNU GPL v2 (or later). Source code: https://github.com/jmacd/xdelta-gpl
+Copyright (C) Joshua P. MacDonald. Unmodified binary, used only to apply the patch.

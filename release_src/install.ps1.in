@@ -1,0 +1,54 @@
+# FB3 Co-op TEST installer. Copies the game folder to a NEW folder and patches data.win there.
+# The original folder is only READ (never written). Usage: install.bat  (or: powershell -ExecutionPolicy Bypass -File install.ps1 [-GameDir "C:\...\Frickbears3"] [-DestName frickbears3-coop])
+param([string]$GameDir = "", [string]$DestName = "frickbears3-coop")
+$ErrorActionPreference = "Stop"
+$SRC_SHA   = "f2cdfb32fabd6b838ecb89bac10bc1cc956a77565fc2530ce1c6f9b9ffd0e38a"   # clean data.win v2.0.2
+$OUT_SHA   = "@OUT_SHA@"                                                          # patched data.win
+$PATCH_SHA = "@PATCH_SHA@"
+$XD_SHA    = "6855c01cf4a1662ba421e6f95370cf9afa2b3ab6c148473c63efe60d634dfb9a"   # xdelta3-3.1.0-x86_64.exe (github.com/jmacd/xdelta-gpl, GPG-signed zip)
+$Here = Split-Path -Parent $MyInvocation.MyCommand.Path
+function Fail($m) { Write-Host ""; Write-Host "ОШИБКА: $m" -ForegroundColor Red; exit 1 }
+function Sha($p) { (Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToLower() }
+
+Write-Host "=== FB3 Co-op (тестовая сборка) — установка в отдельную папку ===" -ForegroundColor Cyan
+$xd = Join-Path $Here "xdelta3.exe"; $patch = Join-Path $Here "fb3coop.xdelta"
+if (!(Test-Path -LiteralPath $xd) -or (Sha $xd) -ne $XD_SHA) { Fail "xdelta3.exe отсутствует или его SHA-256 не совпадает — распакуйте архив заново." }
+if (!(Test-Path -LiteralPath $patch) -or (Sha $patch) -ne $PATCH_SHA) { Fail "fb3coop.xdelta отсутствует или повреждён (SHA-256)." }
+
+if ($GameDir -eq "") {
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dlg.Description = "Выберите папку игры Five Nights at Frickbear's 3 (где лежат Frickbears3.exe и data.win)"
+        if ($dlg.ShowDialog() -eq "OK") { $GameDir = $dlg.SelectedPath }
+    } catch { }
+    if ($GameDir -eq "") { $GameDir = Read-Host "Путь к папке игры (где Frickbears3.exe и data.win)" }
+}
+$GameDir = $GameDir.Trim('"').TrimEnd('\', '/')
+$srcData = Join-Path $GameDir "data.win"
+if (!(Test-Path -LiteralPath (Join-Path $GameDir "Frickbears3.exe")) -or !(Test-Path -LiteralPath $srcData)) { Fail "В '$GameDir' нет Frickbears3.exe или data.win." }
+Write-Host "Проверяю SHA-256 исходного data.win..."
+$h = Sha $srcData
+if ($h -ne $SRC_SHA) { Fail "data.win не совпадает с чистой версией v2.0.2 (SHA-256 $h). Нужна чистая, немодифицированная игра." }
+
+$parent = Split-Path -Parent ((Resolve-Path -LiteralPath $GameDir).Path)
+$dest = Join-Path $parent $DestName; $n = 2
+while (Test-Path -LiteralPath $dest) { $dest = Join-Path $parent ("$DestName-$n"); $n++ }
+$srcFull = (Resolve-Path -LiteralPath $GameDir).Path
+if ($dest.StartsWith($srcFull + [IO.Path]::DirectorySeparatorChar)) { Fail "Папка назначения внутри папки игры — так нельзя." }
+Write-Host "Копирую игру в: $dest  (оригинал не изменяется)"
+New-Item -ItemType Directory -Path $dest | Out-Null
+Get-ChildItem -LiteralPath $srcFull -Force | Copy-Item -Destination $dest -Recurse -Force
+$newData = Join-Path $dest "data.win.new"
+Write-Host "Применяю патч..."
+$runner = $env:FB3_RUNNER   # only for testing on Linux (e.g. "wine"); empty on Windows
+if ($runner) { & $runner $xd -d -f -s $srcData $patch $newData } else { & $xd -d -f -s $srcData $patch $newData }
+if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $newData)) { Fail "xdelta3 завершился с ошибкой (код $LASTEXITCODE). Копия осталась в $dest — её можно удалить." }
+if ((Sha $newData) -ne $OUT_SHA) { Fail "Результат патча не совпал по SHA-256. Копия в $dest — удалите её." }
+Move-Item -LiteralPath $newData -Destination (Join-Path $dest "data.win") -Force
+foreach ($f in "Host.bat", "Join.bat", "README_RU.txt") { Copy-Item -LiteralPath (Join-Path $Here $f) -Destination $dest -Force }
+if ((Sha $srcData) -ne $SRC_SHA) { Fail "Неожиданно изменился исходный data.win!" }
+Write-Host ""
+Write-Host "ГОТОВО. Кооп-версия: $dest" -ForegroundColor Green
+Write-Host "Оригинал не тронут: $srcFull"
+Write-Host "Запуск: Host.bat (создать игру) или Join.bat (к другу через Porthole), подробнее README_RU.txt"
