@@ -3,8 +3,8 @@
 // Works through Porthole / any single-port TCP tunnel: client connects to 127.0.0.1:<port>.
 
 global.Coop = {
-    proto: 1,
-    modver: "0.3.0",
+    proto: 2,
+    modver: "0.4.0",
     mode: "off",          // off | host | client
     server: -1,
     sock: -1,             // client: own socket, host: partner socket
@@ -92,6 +92,7 @@ function coop_parse_args()
         else if (_p == "-coop-botlurechance" && i + 1 < _n) { i++; global.CoopA.lureChance = real(parameter_string(i)); }
         else if (_p == "-coop-botshots" && i + 1 < _n) { i++; _c.botShots = string_split(parameter_string(i), ","); }
     }
+    coop_spec_parse_args();
 }
 
 function coop_is_client() { return global.Coop.mode == "client"; }
@@ -261,13 +262,14 @@ function coop_on_packet(_m)
         case "win":
             _c.partnerWon = true;
             coop_log("partner reached 6AM (night " + string(variable_struct_get(_m, "night")) + ")");
+            if (_c.bot && room == Office && coop_alive()) { global.CoopS.shotPend = "overlay_survived"; global.CoopS.shotAt = current_time + 2500; }
             break;
         case "bye":
             coop_log("partner left: " + string(variable_struct_get(_m, "why")));
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            if (!coop_anim_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
+            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 
@@ -298,7 +300,7 @@ function coop_alive()
 
 function coop_snapshot()
 {
-    var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive() };
+    var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive(), sp: global.CoopS.spec ? 1 : 0 };
     if (room == Office)
     {
         if (variable_global_exists("Power")) { _s.pw = round(global.Power * 10) / 10; }
@@ -365,6 +367,9 @@ function coop_draw_gui()
         draw_text(4, 4, "COOP " + _c.mode + ": " + _c.status + (_c.rtt >= 0 ? "  " + string(_c.rtt) + "ms" : ""));
         draw_set_alpha(1);
     }
+    // --- stage 4: spectator view replaces the death screen; the alive side streams frames ---
+    if (global.CoopS.spec && room == GameOver) { coop_spec_draw(); return; }
+    coop_stream_tick();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
     if (room == Office && _c.connected) { coop_draw_overlay(); }
     if (!_c.menuOpen) { return; }

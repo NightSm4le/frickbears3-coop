@@ -18,7 +18,7 @@ if (room != _c.prevRoom)
 {
     coop_log("room " + room_get_name(room));
     if (_c.prevRoom == Office) { coop_anim_night_end(); }
-    if (room == Office) { coop_anim_night_start(); }
+    if (room == Office) { coop_anim_night_start(); global.CoopS.hintUntil = current_time + 8000; global.CoopS.botDieDone = false; global.CoopS.botHelpStep = 0; }
     if (coop_is_host() && _c.connected && room == NightOpening) { coop_send(coop_night_payload()); }
     _c.prevRoom = room;
 }
@@ -36,6 +36,8 @@ if (_c.connected && current_time - _c.lastSnapSend >= 100)
 // --- stage 3: shared animatronics, overlay keys, title Co-op screen ---
 if (!global.CoopUI.loaded) { coop_ui_load(); IpText = _c.ip; PortText = string(_c.port); }
 coop_anim_step();
+coop_spec_step();
+coop_help_step();
 coop_ui_keys();
 coop_title_step();
 // --- ping (P) ---

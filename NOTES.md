@@ -85,3 +85,18 @@ Fixes: global.Deaths is 0 when a night starts outside New Game/Continue -> coop_
 Results: qa/stage3_run1..3 logs+png. PASS: roster, advance, lure, shared generator, token claim/grant/deny, repelled->partner w/ alert, vent redirect, killer + aggro alert, jumpscare gate, TIMEOUT (client SIGSTOP), client save blocked, no Code Error.
 Known: client GameOver on death (observer mode not implemented yet); aggro capped at AI 20; overlay BR corner overlaps subtitle band, BL covers poster; Wine timer ~0.3x with two copies.
 Bot flags: -coop-botai id=lvl,... -coop-botdoors 0|1 -coop-botcam -coop-botrepel N -coop-botkick S -coop-botlure S -coop-botshots a,b,...
+
+## Stage 4 — spectator + help (modver 0.4.0, proto 2)
+Build: sha256 704cb413b9f4a190220ded828b02b6f8c2dff29b228f49f3b0b516e9cfdd0248, VERIFY OK full.
+- Death in coop while partner alive in Office: count_jumpscare skipped (no lives/Deaths spent), oGameOver Create hijacked
+  (CoopSpec) -> spectator view: partner's frame streamed over the same TCP socket (binary [u8 1][u32 seq][u16 w][u16 h][u8 lvl][zlib]),
+  per-frame ack, adaptive levels 256x144@5fps .. 96x54@1fps by RTT/in-flight/bandwidth budget (-coop-budget KB/s, default 96).
+  HUD of partner on top, P = ping. Partner reaches 6 AM -> spectator also gets win_night (normal progress on host).
+  Both dead -> skipped death is counted, real GameOver on both.
+- Help (Office, partner alive & fresh): G give 10% power (needs >=15, cd 20s, refunded part not accepted),
+  H/J close partner's L/R door 8s for 6% (cd 15s shared, refunded if already closed), L remote lure 3% (cd 15s).
+  Buttons in coop panel (click, Begin Step, mouse_clear only on hit); keys skipped if bound in ControlsOptions; 8s key hint banner.
+- Bot flags: -coop-botlag ms, -coop-bothelp T, -coop-botdie T, -coop-budget KB.
+- Runs: qa/stage4_run{2..6}_{host,client}.log (run1 crashed on builtin `fps` name, artefacts removed).
+- Limitations: relay lag simulated (botlag); xdotool clicks don't reach the game under Wine (button path untested by real input);
+  remote lure only verified as delivered (no active animatronic near on test nights); Endless mode lives untested.

@@ -34,6 +34,8 @@ switch (_type)
     case network_type_data:
         var _b = ds_map_find_value(async_load, "buffer");
         _c.bytesIn += ds_map_find_value(async_load, "size");
+        var _sz = ds_map_find_value(async_load, "size");
+        if (_sz > 10 && buffer_peek(_b, 0, buffer_u8) == 1) { coop_stream_on_frame(_b, _sz); break; } // binary video frame
         buffer_seek(_b, buffer_seek_start, 0);
         var _str = buffer_read(_b, buffer_string);
         var _m = undefined;

@@ -26,5 +26,12 @@ if (stage == "full")
     need(D("gml_Object_oCamera_Step_0").Contains("coop_gen_extra()"), "generator hook missing");
     need(D("gml_Object_oTitleMenu_Create_0").Split("\"Co-op\"").Length - 1 >= 3, "title Co-op entries missing");
     need(D("gml_Object_oTitleMenu_Step_0").Contains("coop_title_select()"), "title select hook missing");
+    foreach (var n in new[] { "gml_GlobalScript_CoopSpec", "gml_Object_oCoopNet_Step_1" })
+        need(Data.Code.ByName(n) != null, n + " missing");
+    need(ss.Contains("coop_spec_skip_count(arg0)"), "count_jumpscare spectator hook missing");
+    need(D("gml_Object_oGameOver_Create_0").Contains("coop_spec_gameover_create()"), "GameOver create hook missing");
+    need(D("gml_Object_oGameOver_Draw_0").Contains("CoopSpec"), "GameOver draw hook missing");
+    need(D("gml_Object_oGameOver_CleanUp_0").Contains("CoopSpec"), "GameOver cleanup hook missing");
+    need(D("gml_Object_oCoopNet_Other_68").Contains("coop_stream_on_frame"), "binary frame branch missing");
 }
 Console.WriteLine(bad.Count == 0 ? "VERIFY OK " + stage : "VERIFY FAIL: " + string.Join("; ", bad));

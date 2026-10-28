@@ -1,7 +1,7 @@
 // ===== Frickbear's Coop: partner overlay, mod settings file, title-menu "Co-op" screen =====
 // Mod settings live in coop_settings.ini (separate from the game's saves).
 
-global.CoopUI = { show: true, corner: 0, loaded: false, forceMode: -1 };
+global.CoopUI = { show: true, corner: 0, loaded: false, forceMode: -1, btns: [] };
 #macro COOP_INI "coop_settings.ini"
 
 function coop_ui_load()
@@ -55,6 +55,7 @@ function coop_partner_state_text()
     var _c = global.Coop;
     if (_c.partnerWon || coop_partner_get("rm", "") == "NightClear") { return ["SURVIVED 6AM", c_lime]; }
     if (current_time - _c.partnerSnapAt > 1500) { return ["no data", c_gray]; }
+    if (coop_partner_get("sp", 0)) { return ["SPECTATING", c_orange]; }
     if (!coop_partner_get("alive", true) || coop_partner_get("rm", "") == "GameOver") { return ["DEAD", c_red]; }
     if (coop_partner_get("rm", "") != "Office") { return [string(coop_partner_get("rm", "?")), c_ltgray]; }
     return ["", c_white];
@@ -69,7 +70,8 @@ function coop_draw_overlay()
     var _st = coop_partner_state_text();
     var _pw = coop_partner_get("pw", 0);
     var _gw = display_get_gui_width(), _gh = display_get_gui_height();
-    var _w = (_mode == 0) ? 116 : 70, _h = (_mode == 0) ? 30 : 14;
+    var _hb = _mode == 0 && coop_partner_fresh() && !coop_partner_get("sp", 0) && coop_alive();
+    var _w = (_mode == 0) ? 116 : 70, _h = (_mode == 0) ? (_hb ? 44 : 30) : 14;
     var _px, _py;
     switch (_u.corner)
     {
@@ -109,6 +111,38 @@ function coop_draw_overlay()
         }
         draw_set_alpha(1);
     }
+    // help buttons (compact panel only): exact rects are click-handled in Begin Step, other clicks reach the game
+    _u.btns = [];
+    if (_mode < 2 && _hb)
+    {
+        _u.btns = coop_help_buttons(_px + 2, _py, _w - 4);
+        var _mx = device_mouse_x_to_gui(0), _my = device_mouse_y_to_gui(0);
+        for (var i = 0; i < array_length(_u.btns); i++)
+        {
+            var _b = _u.btns[i], _cd = coop_help_cd_of(_b[4]) - current_time, _hov = point_in_rectangle(_mx, _my, _b[0], _b[1], _b[2], _b[3]);
+            draw_set_alpha(_hov ? 0.8 : 0.5); draw_set_color(_cd > 0 ? c_dkgray : (_hov ? c_teal : c_black)); draw_rectangle(_b[0], _b[1], _b[2], _b[3], false);
+            draw_set_alpha(0.85); draw_set_color(_cd > 0 ? c_gray : c_white);
+            draw_set_halign(fa_center); draw_text((_b[0] + _b[2]) / 2, _b[1], (_cd > 0) ? string(ceil(_cd / 1000)) + "s" : _b[5]); draw_set_halign(fa_left);
+        }
+        draw_set_alpha(1);
+    }
+    // key hint for the first seconds of a night
+    if (current_time < global.CoopS.hintUntil && coop_alive())
+    {
+        var _ht = "CO-OP: P ping  G give 10% power  H/J close partner's L/R door  L lure partner's cams  Tab hide  F9 move";
+        var _hw = string_width(_ht) + 10;
+        draw_set_alpha(0.5); draw_set_color(c_black); draw_rectangle(_gw / 2 - _hw / 2, _gh - 64, _gw / 2 + _hw / 2, _gh - 50, false);
+        draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh - 63, _ht); draw_set_halign(fa_left); draw_set_alpha(1);
+    }
+    coop_draw_alerts();
+}
+
+function coop_draw_alerts()
+{
+    var _c = global.Coop, _a = global.CoopA;
+    var _gw = display_get_gui_width();
+    var _flash = current_time - _c.pingFlash < 2000;
+    var _blink = ((current_time div 150) mod 2) == 0;
     // alerts: ALWAYS visible (even hidden / cams / jumpscare), small banner top-centre
     var _atxt = "", _acol = c_yellow;
     if (current_time - _a.alertAt < 4000) { _atxt = _a.alertText; _acol = _a.alertCol; }

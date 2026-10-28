@@ -51,6 +51,15 @@ if (stage == "full")
         "function occupy_doorway(arg0, arg1)\n{\n    coop_on_occupy(arg0, arg1);");
     g.QueueFindReplace("gml_Object_oCamera_Step_0", "Usage = global.CamUp + global.Doors[0] + global.Doors[1] + global.Flashlight + global.Fan;",
         "Usage = global.CamUp + global.Doors[0] + global.Doors[1] + global.Flashlight + global.Fan + coop_gen_extra();");
+    // stage 4: spectator - a coop death while the partner lives is not counted and GameOver becomes the spectator view
+    g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function count_jumpscare(arg0)\n{",
+        "function count_jumpscare(arg0)\n{\n    if (coop_spec_skip_count(arg0)) { exit; }");
+    g.QueueFindReplace("gml_Object_oGameOver_Create_0", "Frame = 0;\nAlpha = 0;\nVoiceLineID = -1;",
+        "if (coop_spec_gameover_create()) { CoopSpec = true; exit; }\nFrame = 0;\nAlpha = 0;\nVoiceLineID = -1;");
+    g.QueueFindReplace("gml_Object_oGameOver_Draw_0", "if (global.Jumpscare == -1)\n{\n    draw_sprite_ext(sJumpscareDeathscreen",
+        "if (variable_instance_exists(id, \"CoopSpec\")) { exit; }\nif (global.Jumpscare == -1)\n{\n    draw_sprite_ext(sJumpscareDeathscreen");
+    g.QueueFindReplace("gml_Object_oGameOver_CleanUp_0", "texturegroup_unload(\"DeathScreen\");",
+        "if (variable_instance_exists(id, \"CoopSpec\")) { exit; }\ntexturegroup_unload(\"DeathScreen\");");
     // title menu: real "Co-op" entry before "Quit Game" + its own screen, rendered by the game's own menu code
     g.QueueFindReplace("gml_Object_oTitleMenu_Create_0", "array_push(CurrentOptions, \"Quit Game\");",
         "array_push(CurrentOptions, \"Co-op\");\n                array_push(CurrentOptions, \"Quit Game\");");

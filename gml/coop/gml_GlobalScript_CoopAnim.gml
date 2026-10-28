@@ -323,7 +323,7 @@ function coop_gen_extra()
         coop_log("generator: shared extra load " + string(_a.genExtra) + " -> " + string(_x) + " (my doors closed " + string(floor(_a.myDc)) + "s, partner " + string(floor(_pdc)) + "s)");
         _a.genExtra = _x;
     }
-    return _x;
+    return _x + coop_help_usage_comp();
 }
 
 // ---- hooks ----
