@@ -25,11 +25,34 @@ if (coop_is_host() && _c.connected && room == Office && current_time - _c.lastCl
     _c.lastClockSend = current_time;
     coop_send({ t: "clock", timer: global.Timer });
 }
+// --- partner snapshot ~10/s ---
+if (_c.connected && current_time - _c.lastSnapSend >= 100)
+{
+    _c.lastSnapSend = current_time;
+    coop_send(coop_snapshot());
+}
+// --- ping (P) ---
+if (_c.connected && room == Office && keyboard_check_pressed(ord("P"))) { coop_send_ping(); }
 // --- bot ---
 if (_c.bot)
 {
     BotTimer++;
     if (BotTimer mod 60 == 0) { coop_log(coop_bot_line()); }
+    if (_c.botPing && _c.connected && room == Office && BotTimer mod 150 == 0) { coop_send_ping(); }
+    if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && global.Timer >= _c.botWin)
+    {
+        BotWinDone = true;
+        coop_log("bot: forcing win_night at timer " + string(global.Timer));
+        win_night();
+    }
+    // bot: skip the warning screen the same way pressing space does
+    if (room == WarningScreen && BotTimer > 90 && !BotSkippedWarning)
+    {
+        BotSkippedWarning = true;
+        coop_log("bot: skip warning screen");
+        apply_settings(false);
+        room_goto(TitleScreenMap);
+    }
     if (coop_is_host() && _c.connected && _c.autoNight >= 0 && !AutoNightDone && BotTimer > 180 && room != StartupRoom && room != WarningScreen)
     {
         AutoNightDone = true;

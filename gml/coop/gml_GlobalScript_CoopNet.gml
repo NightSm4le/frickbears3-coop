@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 1,
-    modver: "0.1.0",
+    modver: "0.2.0",
     mode: "off",          // off | host | client
     server: -1,
     sock: -1,             // client: own socket, host: partner socket
@@ -26,7 +26,18 @@ global.Coop = {
     focus: 0,             // 0 none, 1 ip, 2 port
     prevRoom: -1,
     bytesOut: 0,
-    bytesIn: 0
+    bytesIn: 0,
+    // stage 2: partner snapshot / HUD / ping
+    lastSnapSend: 0,
+    partner: undefined,   // last "snap" struct from the partner
+    partnerSnapAt: 0,
+    snapsIn: 0,
+    clockDiff: undefined, // my Timer - partner Timer (seconds), from the last snap
+    pingFlash: -100000,   // current_time of the last received ping
+    lastPingSent: -100000,
+    pingsIn: 0,
+    botPing: false,
+    botWin: -1
 };
 
 function coop_log(_msg)
@@ -54,11 +65,15 @@ function coop_parse_args()
         else if (_p == "-coop-bot") { _c.bot = true; }
         else if (_p == "-coop-autonight" && i + 1 < _n) { i++; _c.autoNight = real(parameter_string(i)); }
         else if (_p == "-coop-log" && i + 1 < _n) { i++; _c.logFile = parameter_string(i); }
+        else if (_p == "-coop-botping") { _c.botPing = true; }
+        else if (_p == "-coop-botwin" && i + 1 < _n) { i++; _c.botWin = real(parameter_string(i)); }
     }
 }
 
 function coop_is_client() { return global.Coop.mode == "client"; }
 function coop_is_host() { return global.Coop.mode == "host"; }
+// coop session in progress: the other player keeps playing, so losing window focus must not pause
+function coop_active() { return variable_global_exists("Coop") && global.Coop.mode != "off"; }
 
 function coop_block_save(_what)
 {
@@ -198,6 +213,19 @@ function coop_on_packet(_m)
                 else { global.Timer += _d * 0.25; }
             }
             break;
+        case "snap": // partner office state, ~10 per second
+            _c.partner = _m;
+            _c.partnerSnapAt = current_time;
+            _c.snapsIn++;
+            if (room == Office && variable_global_exists("Timer") && variable_struct_exists(_m, "tm")) { _c.clockDiff = global.Timer - _m.tm; }
+            else { _c.clockDiff = undefined; }
+            break;
+        case "alert": // partner pressed ping
+            _c.pingFlash = current_time;
+            _c.pingsIn++;
+            audio_play_sound(sfxBitCollect, 10, false);
+            coop_log("ping from partner");
+            break;
         case "win":
             _c.partnerWon = true;
             coop_log("partner reached 6AM (night " + string(variable_struct_get(_m, "night")) + ")");
@@ -228,6 +256,48 @@ function coop_on_win_night()
     coop_log("win_night night=" + string(global.Night));
 }
 
+function coop_alive()
+{
+    if (room == GameOver) { return false; }
+    if (instance_exists(oJumpscareTransition)) { return false; }
+    return true;
+}
+
+function coop_snapshot()
+{
+    var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive() };
+    if (room == Office)
+    {
+        if (variable_global_exists("Power")) { _s.pw = round(global.Power * 10) / 10; }
+        if (variable_global_exists("Doors")) { _s.d0 = global.Doors[0] ? 1 : 0; _s.d1 = global.Doors[1] ? 1 : 0; }
+        if (variable_global_exists("CamUp")) { _s.cu = global.CamUp ? 1 : 0; }
+        if (variable_global_exists("Cam")) { _s.cam = global.Cam; }
+        if (variable_global_exists("MaskDown")) { _s.mk = global.MaskDown ? 1 : 0; }
+        if (variable_global_exists("Fan")) { _s.fan = global.Fan ? 1 : 0; }
+        if (variable_global_exists("Flashlight")) { _s.fl = global.Flashlight ? 1 : 0; }
+        if (variable_global_exists("Temperature")) { _s.tp = round(global.Temperature); }
+        if (variable_global_exists("Timer")) { _s.tm = round(global.Timer * 100) / 100; }
+    }
+    return _s;
+}
+
+function coop_send_ping()
+{
+    var _c = global.Coop;
+    if (!_c.connected || current_time - _c.lastPingSent < 1000) { return false; }
+    _c.lastPingSent = current_time;
+    coop_send({ t: "alert" });
+    coop_log("ping sent");
+    return true;
+}
+
+function coop_partner_get(_k, _def)
+{
+    var _p = global.Coop.partner;
+    if (!is_struct(_p) || !variable_struct_exists(_p, _k)) { return _def; }
+    return variable_struct_get(_p, _k);
+}
+
 function coop_bot_line()
 {
     var _c = global.Coop;
@@ -236,5 +306,8 @@ function coop_bot_line()
     if (variable_global_exists("Timer")) { _s += " timer=" + string_format(global.Timer, 1, 2); }
     if (variable_global_exists("Power")) { _s += " power=" + string(global.Power); }
     _s += " hostTimer=" + string(_c.hostTimer) + " partnerWon=" + string(_c.partnerWon) + " out=" + string(_c.bytesOut) + " in=" + string(_c.bytesIn);
+    _s += " | P: rm=" + string(coop_partner_get("rm", "?")) + " alive=" + string(coop_partner_get("alive", "?")) + " pw=" + string(coop_partner_get("pw", "?"))
+        + " d=" + string(coop_partner_get("d0", "?")) + string(coop_partner_get("d1", "?")) + " cu=" + string(coop_partner_get("cu", "?")) + " cam=" + string(coop_partner_get("cam", "?"))
+        + " snaps=" + string(_c.snapsIn) + " age=" + string(current_time - _c.partnerSnapAt) + " clockDiff=" + (is_undefined(_c.clockDiff) ? "?" : string_format(_c.clockDiff, 1, 2)) + " pingsIn=" + string(_c.pingsIn);
     return _s;
 }

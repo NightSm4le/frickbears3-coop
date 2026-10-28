@@ -34,6 +34,12 @@ if (stage == "full")
         string sig = fn == "save_endless_data" ? "function save_endless_data(arg0 = EndlessSelection, arg1 = true)\n{" : $"function {fn}()\n{{";
         g.QueueFindReplace("gml_GlobalScript_SaveData", sig, sig + "\n    if (coop_block_save(\"" + fn + "\")) { exit; }");
     }
+    // pausers: no auto-pause on focus loss during coop, and keep oCoopNet alive while paused
+    foreach (var pz in new[] { "gml_Object_oPauser_Step_2", "gml_Object_oPersistentPauser_Step_2" })
+    {
+        g.QueueFindReplace(pz, "|| !window_has_focus())", "|| (!window_has_focus() && !coop_active()))");
+        g.QueueFindReplace(pz, "instance_activate_object(oSuperGameManager);", "instance_activate_object(oSuperGameManager);\n    instance_activate_object(oCoopNet);");
+    }
     // host: report night win to the partner
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function win_night()\n{", "function win_night()\n{\n    coop_on_win_night();");
 }
