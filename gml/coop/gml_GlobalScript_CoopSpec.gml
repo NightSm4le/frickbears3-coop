@@ -242,7 +242,7 @@ function coop_spec_draw()
     draw_text(140, 1, string(_hr) + " AM   power " + string(floor(max(_pw, 0))) + "%   doors " + (coop_partner_get("d0", 0) ? "L" : "-") + (coop_partner_get("d1", 0) ? "R" : "-") + "   " + _view);
     draw_set_color(c_ltgray);
     var _age = current_time - _s.lastFrameAt;
-    draw_text(4, _gh - 13, "P - ping partner     you die only if both die; partner 6 AM = night cleared");
+    draw_text(4, _gh - 13, "P ping   M mark partner's cam   you die only if both die; partner 6 AM = night cleared");
     draw_set_halign(fa_right);
     draw_text(_gw - 4, _gh - 13, string(_s.fw) + "x" + string(_s.fh) + " " + string_format(_s.rfps, 1, 1) + "fps" + ((_c.rtt >= 0) ? " " + string(_c.rtt) + "ms" : "") + ((_age > 2000 && _s.framesIn > 0) ? " (stalled)" : ""));
     draw_set_halign(fa_left);
@@ -271,20 +271,19 @@ function coop_help_do(_what, _src)
         case "give":
             if (_now < _s.cdGive) { coop_alert("Give power: cooldown " + string(ceil((_s.cdGive - _now) / 1000)) + "s", c_gray, undefined); return false; }
             if (global.Power < 15) { coop_alert("Give power: need 15%+", c_gray, undefined); return false; }
-            global.Power -= 10; _s.cdGive = _now + 20000; _s.st.give++;
+            global.Power -= 10; _s.cdGive = _now + 20000; _s.st.give++; global.CoopF.sc.give += 10;
             coop_send({ t: "give", amt: 10 });
             coop_alert("Sent 10% power to partner", c_lime, sfxBitCollect);
             break;
         case "warn":
             if (_now < _s.cdWarn) { coop_alert("Warn: cooldown " + string(ceil((_s.cdWarn - _now) / 1000)) + "s", c_gray, undefined); return false; }
-            _s.cdWarn = _now + 20000; _s.st.warn++;
+            _s.cdWarn = _now + 20000; _s.st.warn++; global.CoopF.sc.warn++;
             coop_send({ t: "warn" });
             coop_alert("Warning sent to partner (they see where the threat is)", c_lime, undefined);
             break;
         case "lure":
             if (_now < _s.cdLure) { coop_alert("Remote lure: cooldown " + string(ceil((_s.cdLure - _now) / 1000)) + "s", c_gray, undefined); return false; }
-            if (global.Power < 5) { coop_alert("Remote lure: need 5%+", c_gray, undefined); return false; }
-            global.Power -= 3; _s.cdLure = _now + 15000; _s.st.lure++;
+            _s.cdLure = _now + 15000; _s.st.lure++; // 0.5.0: free (no power cost)
             coop_send({ t: "rlure" });
             coop_alert("Remote lure played in partner's office", c_lime, sfxBitCollect);
             break;
@@ -332,7 +331,7 @@ function coop_help_packet(_t, _m)
             {
                 _s.st.refunds++;
                 var _ref = (_m.what == "give") ? _m.amt : 0;
-                if (room == Office) { global.Power += _ref; }
+                if (room == Office) { global.Power += _ref; } global.CoopF.sc.give = max(0, global.CoopF.sc.give - _ref);
                 coop_alert("Help not needed (" + _m.what + "), refunded " + string(round(_ref)) + "%", c_gray, undefined);
                 coop_log("help: " + _m.what + " refused by partner, refund " + string(_ref));
             }
@@ -344,51 +343,7 @@ function coop_help_packet(_t, _m)
 // usage compensation (door help removed in 0.4.1)
 function coop_help_usage_comp() { return 0; }
 
-// where is the nearest threat in MY office? -> [where ("L"|"R"|"V"|"CLEAR"), name]
-function coop_warn_threat()
-{
-    var _a = global.CoopA;
-    for (var s = 0; s < 2; s++) { if (global.DoorOccupant[s] >= 0) { return [s ? "R" : "L", coop_anim_name(global.DoorOccupant[s])]; } }
-    for (var n = 0; n < array_length(_a.ids); n++)
-    {
-        var _i = coop_anim_inst(_a.ids[n]);
-        if (_i == noone) { continue; }
-        var _k = coop_anim_kind(_i), _near = false;
-        if (_k == "stage") { _near = _i.Stage == "Hallway" || _i.Stage == "TransitionC" || _i.Stage == "Doorway"; }
-        else if (_k == "vent") { _near = _i.Mode != "Vents" || _i.VentY >= 1; }
-        else if (_k == "foxy") { _near = _i.Mode == "Run" || _i.Phase > _i.WaitTime * 0.6; }
-        if (!_near) { continue; }
-        var _w = "V";
-        if (_k != "vent") { _w = (variable_instance_exists(_i, "Side") && _i.Side > 0) ? "R" : "L"; }
-        return [_w, coop_anim_name(_a.ids[n])];
-    }
-    return ["CLEAR", ""];
-}
-
-// flashing marker in my office after a partner's warning (GUI 640x360): steady 1.6 s, then blinking
-function coop_warn_draw()
-{
-    var _s = global.CoopS;
-    if (room != Office || current_time > _s.warnUntil) { return; }
-    if (_s.warnUntil - current_time < 1200 && (current_time div 150) mod 2) { return; }
-    var _w = display_get_gui_width(), _h = display_get_gui_height();
-    draw_set_font(-1); draw_set_halign(fa_center); draw_set_valign(fa_middle);
-    if (_s.warnWhere == "CLEAR")
-    {
-        draw_set_color(c_lime);
-        for (var i = 0; i < 3; i++) { draw_rectangle(_w / 2 - 80 + i, _h / 2 - 16 + i, _w / 2 + 80 - i, _h / 2 + 16 - i, true); }
-        draw_text(_w / 2, _h / 2, "PARTNER: ALL CLEAR");
-    }
-    else
-    {
-        draw_set_color(c_red);
-        var _lab = "PARTNER: " + string_upper(_s.warnName);
-        if (_s.warnWhere == "L") { for (var i = 0; i < 4; i++) { draw_rectangle(i, 40 + i, 60 - i, _h - 40 - i, true); } draw_triangle(100, _h / 2 - 20, 100, _h / 2 + 20, 66, _h / 2, false); draw_text(190, _h / 2, "<< " + _lab); }
-        else if (_s.warnWhere == "R") { for (var i = 0; i < 4; i++) { draw_rectangle(_w - 60 + i, 40 + i, _w - 1 - i, _h - 40 - i, true); } draw_triangle(_w - 100, _h / 2 - 20, _w - 100, _h / 2 + 20, _w - 66, _h / 2, false); draw_text(_w - 190, _h / 2, _lab + " >>"); }
-        else { for (var i = 0; i < 4; i++) { draw_rectangle(_w / 2 - 120 + i, 30 + i, _w / 2 + 120 - i, 70 - i, true); } draw_text(_w / 2, 84, "VENT: " + _lab); }
-    }
-    draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(c_white);
-}
+// coop_warn_threat / coop_warn_draw moved to CoopFeat (0.5.0: compact pixel icons)
 
 // oCoopNet Step (Office)
 function coop_help_step()
@@ -415,7 +370,7 @@ function coop_help_step()
 // button rects under the mini-window (only in compact mode): [x1, y1, x2, y2, action, label]
 function coop_help_buttons(_px, _py, _w)
 {
-    var _bw = (_w - 2 * 2) / 3, _y1 = _py + 32, _y2 = _py + 43;
+    var _bw = (_w - 2 * 2) / 3, _y1 = _py + 31, _y2 = _py + 46;
     var _r = [];
     var _def = [["give", "G+pw"], ["warn", "H !"], ["lure", "L lure"]];
     for (var i = 0; i < 3; i++) { var _x1 = _px + i * (_bw + 2); array_push(_r, [_x1, _y1, _x1 + _bw, _y2, _def[i][0], _def[i][1]]); }

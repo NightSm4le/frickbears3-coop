@@ -117,6 +117,29 @@ make_release.sh: official xdelta3 3.1.0 exe (GPG-verified, sha 6855c01c…) unde
 hashes of xdelta3/patch/source data.win, copies game to sibling frickbears3-coop[-N], patches only copy, verifies output sha, re-checks source.
 Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy — see qa/installer_test.txt. install.bat path / Windows PS 5.1 untested.
 
+## 0.5.0 — co-op saves, compact warn icons, marks, revive, joint door, night score (2026-10-29)
+- Saves: SaveData filenames get global.CoopSaveTag (apply.csx FindReplace, 9 sites). coop_save_enter() on co-op start (host+client):
+  copy savedata/records/endlessdata -> *_coop[_tag].* only if missing, then reload; coop_save_leave() restores "" and reloads.
+  -coop-savetag X for tests. Proof: sha256 of the original .wario in prefA/prefB identical before/after runs 1-4 (qa/save_hash_*.txt).
+- H warn: pixel icons (art/icons.py -> CoopIcons.gml, palette K/W/R/G), 15x12 px, alpha pulse 0.7..1, outlined label, font restored after draw.
+  coop_threat_of(): DoorOccupant -> L/R; Freddy/Bonnie/Chica Stage+Side; Foxy Mode -> L; oVentParent VentY/Mode -> V; Marionette MusicTimer<=20 -> M;
+  Plushtrap/Dreadbear/Nightmarionne Side; in-office kinds -> "!". Selftest -coop-botwarnself T sets REAL instance state, restores it (qa/help_warn_v2.png).
+- M mark (cd 1 s, 8 s, pin on cam map + "PARTNER MARK", spectator can mark), V revive (hold 3 s, 1/night, reviver doors forced open,
+  revived: 35% power, 6 s invulnerable via gate), joint door (host, 5 s warning + 3 s window, fail = forced jumpscare both),
+  score panel at NightClear / GameOver (rep, warn, rev, give, jd, total). Lure L now free.
+- Bot flags: -coop-botwarnself, -coop-botmark, -coop-botspecmark, -coop-botrevive, -coop-botjd, -coop-botjdclose 0/1, -coop-botrlure, -coop-botkick.
+- Runs: qa/v050/r1..r4 (*.png, *_shots.txt).
+
+## Bosses — analysis only (not implemented)
+- oSalvage (Salvage boss night): HP/MaxHP=100, lose_hp() via shocks/powerout * HPDrainRate, siphon heals +1/120 per step, phases 6-ceil(HP/MaxHP*5).
+- oFredbear (final route boss, music phases), oScraptrap (task list / TimeToKill, not HP), oPhonyBoss_Crony + oPhonyAttack_Window, BossMyWayRoom,
+  oExtras_Bosses (boss selector sets global.Route + AllTimeSalvages).
+- Plan A (shared HP): host owns HP; client sends "dmg" events (its lose_hp args), host applies and broadcasts HP/Phase at 5 Hz; client sets HP each step
+  (local lose_hp only predicted). Death: boss +1 aggression (HPDrainRate*0.9, shorter cooldowns), dead player = spectator, can mark, can be revived (V).
+- Plan B: each fights own boss copy, win when SUM of damage reaches MaxHP (no per-step sync, robust on bad links).
+- Plan C: role split — one player damages (shocks), other defends (doors/vents) with remote help; boss HP only on host.
+- Scraptrap (no HP): shared task progress instead of HP. Risks: phase transitions/cutscenes must be host-driven; endings write saves (co-op tag ok).
+
 ## LATER (user notes, do not do yet)
 - Sprites: players in animatronic masks, game pixel style, P1/P2 different colors; always 2–3 drafts first, final only after approval.
 - Stage 7: host sets one difficulty for both; money/upgrades per player, shop shows partner's purchases; night reward for both incl. spectator;
@@ -124,5 +147,6 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
 - Co-op settings screen (host, game style), sent in welcome, applies to both, stored in separate co-op config: wallet shared/separate (default separate);
   spectator reward full/50%/0; revives off/1/2 per night; toggles: animatronic crossover, shared generator, "both hold the door" event,
   vent animatronic chooses office without cameras; survivor killer-rage weak/normal/strong.
-- Approved features queue: camera marks (~8 s, also spectator), revive (once/night, 3 s hold, reviver vulnerable), joint "both hold the door" event
-  (host, warning, 3 s window), night score at 6 AM/GameOver, shared boss HP (analysis first). Stage 6: 3D co-op in MinigameMaze_1.
+- DONE in 0.5.0: marks, revive, joint door, night score, separate co-op saves. Still LATER: co-op settings screen, stage 7 (shared difficulty,
+  per-player money/upgrades), shared boss HP implementation (plan above), Stage 6: 3D co-op in MinigameMaze_1. Mask sprites: drafts only
+  (qa/sprites_masks_sheet.png, qa/sprites_masks_mock.png), final after user approval.

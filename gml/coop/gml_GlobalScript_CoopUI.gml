@@ -71,7 +71,7 @@ function coop_draw_overlay()
     var _pw = coop_partner_get("pw", 0);
     var _gw = display_get_gui_width(), _gh = display_get_gui_height();
     var _hb = _mode == 0 && coop_partner_fresh() && !coop_partner_get("sp", 0) && coop_alive();
-    var _w = (_mode == 0) ? 116 : 70, _h = (_mode == 0) ? (_hb ? 44 : 30) : 14;
+    var _w = (_mode == 0) ? 116 : 70, _h = (_mode == 0) ? (_hb ? 48 : 30) : 14;
     var _px, _py;
     switch (_u.corner)
     {
@@ -122,14 +122,14 @@ function coop_draw_overlay()
             var _b = _u.btns[i], _cd = coop_help_cd_of(_b[4]) - current_time, _hov = point_in_rectangle(_mx, _my, _b[0], _b[1], _b[2], _b[3]);
             draw_set_alpha(_hov ? 0.8 : 0.5); draw_set_color(_cd > 0 ? c_dkgray : (_hov ? c_teal : c_black)); draw_rectangle(_b[0], _b[1], _b[2], _b[3], false);
             draw_set_alpha(0.85); draw_set_color(_cd > 0 ? c_gray : c_white);
-            draw_set_halign(fa_center); draw_text((_b[0] + _b[2]) / 2, _b[1], (_cd > 0) ? string(ceil(_cd / 1000)) + "s" : _b[5]); draw_set_halign(fa_left);
+            draw_set_halign(fa_center); draw_text((_b[0] + _b[2]) / 2, _b[1] + 1, (_cd > 0) ? string(ceil(_cd / 1000)) + "s" : _b[5]); draw_set_halign(fa_left);
         }
         draw_set_alpha(1);
     }
     // key hint for the first seconds of a night
     if (current_time < global.CoopS.hintUntil && coop_alive())
     {
-        var _ht = "CO-OP: P ping  G give 10% power  H warn partner  L lure on partner's cams  Tab hide  F9 move";
+        var _ht = "CO-OP: P ping G give H warn L lure M mark V revive Tab hide F9 move";
         var _hw = string_width(_ht) + 10;
         draw_set_alpha(0.5); draw_set_color(c_black); draw_rectangle(_gw / 2 - _hw / 2, _gh - 64, _gw / 2 + _hw / 2, _gh - 50, false);
         draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh - 63, _ht); draw_set_halign(fa_left); draw_set_alpha(1);

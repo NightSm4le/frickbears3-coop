@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 2,
-    modver: "0.4.1",
+    modver: "0.5.0",
     mode: "off",          // off | host | client
     server: -1,
     sock: -1,             // client: own socket, host: partner socket
@@ -93,6 +93,7 @@ function coop_parse_args()
         else if (_p == "-coop-botshots" && i + 1 < _n) { i++; _c.botShots = string_split(parameter_string(i), ","); }
     }
     coop_spec_parse_args();
+    coop_feat_parse_args();
 }
 
 function coop_is_client() { return global.Coop.mode == "client"; }
@@ -102,11 +103,8 @@ function coop_active() { return variable_global_exists("Coop") && global.Coop.mo
 
 function coop_block_save(_what)
 {
-    if (coop_is_client())
-    {
-        coop_log("save blocked on client: " + _what);
-        return true;
-    }
+    // 0.5.0: both sides write their OWN co-op save file (global.CoopSaveTag), the original is never touched
+    if (coop_active()) { coop_log("save -> co-op file (" + global.CoopSaveTag + "): " + _what); }
     return false;
 }
 
@@ -126,6 +124,7 @@ function coop_host(_port)
     _c.mode = "host";
     _c.status = "hosting on port " + string(_port) + ", waiting";
     coop_log(_c.status);
+    coop_save_enter();
     return true;
 }
 
@@ -143,6 +142,7 @@ function coop_join(_ip, _port)
     coop_log(_c.status);
     network_connect_async(_c.sock, _ip, _port);
     _c.lastRecv = current_time;
+    coop_save_enter();
     return true;
 }
 
@@ -269,7 +269,7 @@ function coop_on_packet(_m)
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
+            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 
@@ -300,7 +300,7 @@ function coop_alive()
 
 function coop_snapshot()
 {
-    var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive(), sp: global.CoopS.spec ? 1 : 0 };
+    var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive(), sp: global.CoopS.spec ? 1 : 0, sc: coop_score_arr() };
     if (room == Office)
     {
         if (variable_global_exists("Power")) { _s.pw = round(global.Power * 10) / 10; }
@@ -371,6 +371,7 @@ function coop_draw_gui()
     if (global.CoopS.spec && room == GameOver) { coop_spec_draw(); return; }
     coop_stream_tick();
     coop_warn_draw();
+    coop_feat_draw();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
     if (room == Office && _c.connected) { coop_draw_overlay(); }
     if (!_c.menuOpen) { return; }

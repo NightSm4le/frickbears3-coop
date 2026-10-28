@@ -33,5 +33,13 @@ if (stage == "full")
     need(D("gml_Object_oGameOver_Draw_0").Contains("CoopSpec"), "GameOver draw hook missing");
     need(D("gml_Object_oGameOver_CleanUp_0").Contains("CoopSpec"), "GameOver cleanup hook missing");
     need(D("gml_Object_oCoopNet_Other_68").Contains("coop_stream_on_frame"), "binary frame branch missing");
+    // 0.5.0: co-op save redirect + features
+    need(dec.Split("global.CoopSaveTag").Length - 1 >= 9, "co-op save tag not on every save file name");
+    need(!dec.Contains("global.CurrentVersion + \".wario\"") && !dec.Contains("global.CurrentVersion + \".txt\""), "untagged save file name left");
+    foreach (var n in new[] { "gml_GlobalScript_CoopFeat", "gml_GlobalScript_CoopIcons" })
+        need(Data.Code.ByName(n) != null, n + " missing");
+    var net = D("gml_GlobalScript_CoopNet");
+    need(net.Split("coop_save_enter()").Length - 1 >= 2, "coop_save_enter not called from host+join");
+    need(net.Contains("coop_feat_packet("), "feature packets not dispatched");
 }
 Console.WriteLine(bad.Count == 0 ? "VERIFY OK " + stage : "VERIFY FAIL: " + string.Join("; ", bad));

@@ -34,6 +34,13 @@ if (stage == "full")
         string sig = fn == "save_endless_data" ? "function save_endless_data(arg0 = EndlessSelection, arg1 = true)\n{" : $"function {fn}()\n{{";
         g.QueueFindReplace("gml_GlobalScript_SaveData", sig, sig + "\n    if (coop_block_save(\"" + fn + "\")) { exit; }");
     }
+    // 0.5.0 co-op saves: every save file name gets global.CoopSaveTag ("" normally, "_coop" in co-op)
+    foreach (var bn in new[] { "\"savedata\" + global.CurrentVersion + \".wario\"", "\"records\" + global.CurrentVersion + \".wario\"", "\"endlessdata\" + global.CurrentVersion + \".txt\"" })
+    {
+        string ext = bn.Contains(".txt") ? "\".txt\"" : "\".wario\"";
+        string head = bn.Substring(0, bn.Length - ext.Length);
+        g.QueueFindReplace("gml_GlobalScript_SaveData", bn, head + "(variable_global_exists(\"CoopSaveTag\") ? global.CoopSaveTag : \"\") + " + ext);
+    }
     // pausers: no auto-pause on focus loss during coop, and keep oCoopNet alive while paused
     foreach (var pz in new[] { "gml_Object_oPauser_Step_2", "gml_Object_oPersistentPauser_Step_2" })
     {

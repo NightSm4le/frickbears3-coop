@@ -331,6 +331,13 @@ function coop_jumpscare_gate(_id)
 {
     if (!coop_active() || !global.Coop.connected || room != Office || !is_numeric(_id) || _id < 0 || _id > 200) { return false; }
     var _a = global.CoopA;
+    if (global.CoopF.forceJs) { _a.lastKiller = _id; coop_log("jumpscare(" + coop_anim_name(_id) + ") forced (joint door event)"); return false; }
+    if (current_time < global.CoopF.invulUntil)
+    {
+        coop_log("GATE: jumpscare by " + coop_anim_name(_id) + " cancelled - revived player is invulnerable");
+        coop_anim_retreat(_id, "revive invulnerability");
+        return true;
+    }
     _a.st.jumpscares++;
     if (coop_partner_holds(_id))
     {
@@ -358,7 +365,7 @@ function coop_on_block(_inst)
     var _a = global.CoopA;
     var _id = -1;
     try { _id = coop_anim_id_of(_inst); } catch (_e) { _id = -1; }
-    _a.st.blocks++;
+    _a.st.blocks++; global.CoopF.sc.rep++;
     coop_log("block_tokens by " + coop_anim_name(_id));
     if (_id < 0 || !coop_partner_fresh()) { return; }
     if (irandom(99) < _a.repelChance)
@@ -433,6 +440,7 @@ function coop_anim_packet(_t, _m)
         case "lured":
             if (_id >= 0)
             {
+                global.CoopF.rlureHit = true; coop_log("LURE PROOF: partner reports my lure pulled " + coop_anim_name(_id)); coop_log("SHOT lure_proof");
                 coop_alert("Your lure pulled " + coop_anim_name(_id) + " from partner!", c_lime, sfxBitCollect);
                 if (room == Office && coop_anim_inst(_id) != noone) { coop_anim_boost(_id, 3, 30000, "came for my lure"); }
             }
