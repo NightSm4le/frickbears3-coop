@@ -11,3 +11,5 @@ BotDoorsDone = false;
 DrawCount = 0;
 IpText = _c.ip;
 PortText = string(_c.port);
+BotKickDone = false;
+BotShotLogged = false;

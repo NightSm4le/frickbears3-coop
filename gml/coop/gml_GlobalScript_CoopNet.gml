@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 1,
-    modver: "0.2.0",
+    modver: "0.3.0",
     mode: "off",          // off | host | client
     server: -1,
     sock: -1,             // client: own socket, host: partner socket
@@ -38,7 +38,17 @@ global.Coop = {
     pingsIn: 0,
     botPing: false,
     botWin: -1,
-    botDoors: -1
+    botDoors: -1,
+    botAI: [],            // [[id, level], ...]
+    botCam: false,
+    botKick: -1,
+    botLure: -1,
+    botLureNext: 0,
+    botShots: [],
+    botShot: "",
+    botShotIdx: -1,
+    botShotAt: 0,
+    botDie: -1
 };
 
 function coop_log(_msg)
@@ -69,6 +79,18 @@ function coop_parse_args()
         else if (_p == "-coop-botping") { _c.botPing = true; }
         else if (_p == "-coop-botdoors" && i + 1 < _n) { i++; _c.botDoors = real(parameter_string(i)); }
         else if (_p == "-coop-botwin" && i + 1 < _n) { i++; _c.botWin = real(parameter_string(i)); }
+        else if (_p == "-coop-botai" && i + 1 < _n)
+        {
+            i++;
+            var _parts = string_split(parameter_string(i), ",");
+            for (var k = 0; k < array_length(_parts); k++) { var _kv = string_split(_parts[k], "="); if (array_length(_kv) == 2) { array_push(_c.botAI, [real(_kv[0]), real(_kv[1])]); } }
+        }
+        else if (_p == "-coop-botcam") { _c.botCam = true; }
+        else if (_p == "-coop-botkick" && i + 1 < _n) { i++; _c.botKick = real(parameter_string(i)); }
+        else if (_p == "-coop-botlure" && i + 1 < _n) { i++; _c.botLure = real(parameter_string(i)); }
+        else if (_p == "-coop-botrepel" && i + 1 < _n) { i++; global.CoopA.repelChance = real(parameter_string(i)); }
+        else if (_p == "-coop-botlurechance" && i + 1 < _n) { i++; global.CoopA.lureChance = real(parameter_string(i)); }
+        else if (_p == "-coop-botshots" && i + 1 < _n) { i++; _c.botShots = string_split(parameter_string(i), ","); }
     }
 }
 
@@ -199,6 +221,7 @@ function coop_on_packet(_m)
             _c.hostNight = variable_struct_get(_m, "night");
             _c.partnerWon = false;
             global.Night = variable_struct_get(_m, "night");
+            coop_prepare_night();
             if (variable_struct_exists(_m, "difficulty")) { global.Difficulty = _m.difficulty; }
             if (variable_struct_exists(_m, "ai")) { global.AILevels = _m.ai; }
             if (variable_struct_exists(_m, "speedup")) { global.NightSpeedup = _m.speedup; }
@@ -219,6 +242,13 @@ function coop_on_packet(_m)
             _c.partner = _m;
             _c.partnerSnapAt = current_time;
             _c.snapsIn++;
+            if (coop_is_host() && variable_struct_exists(_m, "tk") && is_array(_m.tk))
+            {
+                var _A = global.CoopA;
+                var _in = array_create(201, false);
+                for (var k = 0; k < array_length(_m.tk); k++) { var _q = _m.tk[k]; if (_q >= 0 && _q < 201) { _in[_q] = true; if (_A.tok[_q] == 2) { _A.tokAt[_q] = current_time; } } }
+                for (var k = 0; k < 201; k++) { if (_A.tok[k] == 2 && !_in[k] && current_time - _A.tokAt[k] > 600) { _A.tok[k] = 0; coop_log("token: client no longer holds " + coop_anim_name(k)); } }
+            }
             if (room == Office && variable_global_exists("Timer") && variable_struct_exists(_m, "tm")) { _c.clockDiff = global.Timer - _m.tm; }
             else { _c.clockDiff = undefined; }
             break;
@@ -237,7 +267,7 @@ function coop_on_packet(_m)
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            coop_log("unknown packet " + string(_t));
+            if (!coop_anim_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 
@@ -250,6 +280,7 @@ function coop_drop_partner(_why)
     _c.rtt = -1;
     _c.status = "hosting on port " + string(_c.port) + ", waiting (" + _why + ")";
     coop_log("partner dropped: " + _why);
+    if (variable_global_exists("CoopA")) { for (var i = 0; i < array_length(global.CoopA.tok); i++) { if (global.CoopA.tok[i] == 2) { global.CoopA.tok[i] = 0; coop_log("token: partner dropped -> released " + coop_anim_name(i)); } } }
 }
 
 function coop_on_win_night()
@@ -279,6 +310,10 @@ function coop_snapshot()
         if (variable_global_exists("Flashlight")) { _s.fl = global.Flashlight ? 1 : 0; }
         if (variable_global_exists("Temperature")) { _s.tp = round(global.Temperature); }
         if (variable_global_exists("Timer")) { _s.tm = round(global.Timer * 100) / 100; }
+        _s.tk = coop_anim_held_list();
+        _s.dc = floor(global.CoopA.myDc);
+        if (variable_global_exists("PanelUp")) { _s.pu = global.PanelUp ? 1 : 0; }
+        if (variable_global_exists("MonitorSystem")) { _s.ms = global.MonitorSystem; }
     }
     return _s;
 }
@@ -307,6 +342,7 @@ function coop_bot_line()
     if (variable_global_exists("Night")) { _s += " night=" + string(global.Night); }
     if (variable_global_exists("Timer")) { _s += " timer=" + string_format(global.Timer, 1, 2); }
     if (variable_global_exists("Power")) { _s += " power=" + string(global.Power); }
+    if (room == Office) { _s += " AI1=" + string(global.AILevels[1]) + " AI2=" + string(global.AILevels[2]) + " AI12=" + string(global.AILevels[12]) + " d=" + string(global.Doors[0]) + string(global.Doors[1]) + " cu=" + string(global.CamUp) + " tk=" + json_stringify(coop_anim_held_list()) + " gen=" + string(global.CoopA.genExtra); }
     _s += " hostTimer=" + string(_c.hostTimer) + " partnerWon=" + string(_c.partnerWon) + " out=" + string(_c.bytesOut) + " in=" + string(_c.bytesIn);
     _s += " | P: rm=" + string(coop_partner_get("rm", "?")) + " alive=" + string(coop_partner_get("alive", "?")) + " pw=" + string(coop_partner_get("pw", "?"))
         + " d=" + string(coop_partner_get("d0", "?")) + string(coop_partner_get("d1", "?")) + " cu=" + string(coop_partner_get("cu", "?")) + " cam=" + string(coop_partner_get("cam", "?"))
@@ -322,59 +358,15 @@ function coop_draw_gui()
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);
     // small status line (always, when coop active)
-    if (_c.mode != "off" && !_c.menuOpen && !(room == Office && _c.connected))
+    if (_c.mode != "off" && !_c.menuOpen && !(room == Office && _c.connected) && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op"))
     {
         draw_set_alpha(0.7);
         draw_set_color(c_white);
         draw_text(4, 4, "COOP " + _c.mode + ": " + _c.status + (_c.rtt >= 0 ? "  " + string(_c.rtt) + "ms" : ""));
         draw_set_alpha(1);
     }
-    // --- partner mini-window (Office, connected) ---
-    if (room == Office && _c.connected)
-    {
-        var _gw0 = display_get_gui_width();
-        var _w = 150, _h = 84;
-        var _px = _gw0 - _w - 4, _py = 30;
-        var _fresh = current_time - _c.partnerSnapAt < 1000;
-        var _alive = coop_partner_get("alive", true);
-        var _flash = current_time - _c.pingFlash < 2000;
-        draw_set_alpha(0.75); draw_set_color(c_black); draw_rectangle(_px, _py, _px + _w, _py + _h, false); draw_set_alpha(1);
-        var _border = _flash ? (((current_time div 150) mod 2) ? c_yellow : c_red) : (_alive ? c_white : c_red);
-        draw_set_color(_border); draw_rectangle(_px, _py, _px + _w, _py + _h, true);
-        if (_flash) { draw_rectangle(_px + 1, _py + 1, _px + _w - 1, _py + _h - 1, true); }
-        draw_set_color(c_white);
-        draw_text(_px + 4, _py + 2, "PARTNER" + (_c.rtt >= 0 ? "  " + string(_c.rtt) + "ms" : ""));
-        if (!_fresh) { draw_set_color(c_gray); draw_text(_px + 4, _py + 18, "no data..."); }
-        else if (!_alive) { draw_set_color(c_red); draw_text(_px + 4, _py + 18, "DEAD - spectating"); }
-        else if (coop_partner_get("rm", "") != "Office") { draw_text(_px + 4, _py + 18, "in " + string(coop_partner_get("rm", "?"))); }
-        else
-        {
-            var _pw = coop_partner_get("pw", 0);
-            draw_text(_px + 4, _py + 18, "PWR " + string(max(_pw, 0)) + "%");
-            // power bar
-            draw_set_color(c_dkgray); draw_rectangle(_px + 76, _py + 21, _px + _w - 6, _py + 29, false);
-            draw_set_color(_pw > 25 ? c_lime : c_red); draw_rectangle(_px + 76, _py + 21, _px + 76 + (_w - 82) * clamp(_pw, 0, 100) / 100, _py + 29, false);
-            // doors
-            draw_set_color(c_white);
-            draw_text(_px + 4, _py + 34, "L");
-            draw_set_color(coop_partner_get("d0", 0) ? c_red : c_dkgray); draw_rectangle(_px + 16, _py + 35, _px + 30, _py + 47, false);
-            draw_set_color(c_white);
-            draw_text(_px + 36, _py + 34, "R");
-            draw_set_color(coop_partner_get("d1", 0) ? c_red : c_dkgray); draw_rectangle(_px + 48, _py + 35, _px + 62, _py + 47, false);
-            draw_set_color(c_white);
-            var _view = coop_partner_get("cu", 0) ? "CAM " + string(coop_partner_get("cam", "?")) : "OFFICE";
-            if (coop_partner_get("mk", 0)) { _view = "MASK"; }
-            draw_text(_px + 70, _py + 34, _view);
-            var _ex = "";
-            if (coop_partner_get("fan", 0)) { _ex += "FAN "; }
-            if (coop_partner_get("fl", 0)) { _ex += "LIGHT "; }
-            _ex += "T" + string(coop_partner_get("tp", 0));
-            draw_text(_px + 4, _py + 50, _ex);
-        }
-        draw_set_color(_flash ? c_yellow : c_gray);
-        draw_text(_px + 4, _py + 66, _flash ? "PING!" : "P = ping");
-        draw_set_color(c_white);
-    }
+    // --- partner mini-window + alerts (Office, connected): see CoopUI ---
+    if (room == Office && _c.connected) { coop_draw_overlay(); }
     if (!_c.menuOpen) { return; }
     var _gw = display_get_gui_width(), _gh = display_get_gui_height();
     var _x = _gw / 2 - 150, _y = _gh / 2 - 90;
@@ -396,4 +388,11 @@ function coop_draw_gui()
         draw_text(_bx + 8, _y + 114, _labels[i]);
     }
     draw_text(_x + 10, _y + 145, _c.status);
+}
+
+// Starting a story night straight from the title (coop night start / bot) skips the game's New Game/Continue path;
+// at boot initialize_endless_data() leaves global.Deaths = 0 (a number), and count_jumpscare / NightClear then index it.
+function coop_prepare_night()
+{
+    if (!is_array(global.Deaths)) { global.Deaths = [0, 0, 0, 0, 0, 0]; coop_log("prepare night: global.Deaths was not an array -> [0,0,0,0,0,0]"); }
 }

@@ -17,6 +17,8 @@ else if (coop_is_client() && current_time - _c.lastRecv > 12000)
 if (room != _c.prevRoom)
 {
     coop_log("room " + room_get_name(room));
+    if (_c.prevRoom == Office) { coop_anim_night_end(); }
+    if (room == Office) { coop_anim_night_start(); }
     if (coop_is_host() && _c.connected && room == NightOpening) { coop_send(coop_night_payload()); }
     _c.prevRoom = room;
 }
@@ -31,6 +33,11 @@ if (_c.connected && current_time - _c.lastSnapSend >= 100)
     _c.lastSnapSend = current_time;
     coop_send(coop_snapshot());
 }
+// --- stage 3: shared animatronics, overlay keys, title Co-op screen ---
+if (!global.CoopUI.loaded) { coop_ui_load(); IpText = _c.ip; PortText = string(_c.port); }
+coop_anim_step();
+coop_ui_keys();
+coop_title_step();
 // --- ping (P) ---
 if (_c.connected && room == Office && keyboard_check_pressed(ord("P"))) { coop_send_ping(); }
 // --- bot ---
@@ -53,6 +60,39 @@ if (_c.bot)
         coop_log("bot: forcing win_night at timer " + string(global.Timer));
         win_night();
     }
+    if (room == Office && variable_global_exists("AILevels"))
+    {
+        // bot AI levels (applied as a floor, every frame, so the hour-change ai_set and our boosts stack on top)
+        for (var k = 0; k < array_length(_c.botAI); k++) { var _e = _c.botAI[k]; if (global.AILevels[_e[0]] < _e[1]) { global.AILevels[_e[0]] = _e[1]; } }
+        if (_c.botCam && _c.botShot == "") { global.CamUp = 1; global.MonitorSystem = "Cameras"; }
+        if (_c.botKick >= 0 && !BotKickDone && global.Timer >= _c.botKick)
+        {
+            BotKickDone = true;
+            coop_log("bot: kick - advancing every active animatronic at timer " + string(global.Timer));
+            for (var k = 0; k < array_length(global.CoopA.ids); k++) { var _q = global.CoopA.ids[k]; if (global.AILevels[_q] > 0) { coop_anim_advance(_q, "bot kick"); } }
+        }
+        if (_c.botLure >= 0 && global.Timer >= _c.botLure && current_time >= _c.botLureNext)
+        {
+            _c.botLureNext = current_time + 16000;
+            global.AudioLureX = choose(-1, 0, 1); global.AudioLureY = (global.AudioLureY == 0) ? 1 : 0;
+            coop_log("bot: audio lure at " + string(global.AudioLureX) + "," + string(global.AudioLureY));
+        }
+    }
+    // bot screenshot choreography: each step held 5 s, "SHOT <name>" logged after 2.5 s
+    if (array_length(_c.botShots) > 0 && (room == Office || (room == TitleScreenMap && _c.autoNight < 0)) && BotTimer > 240 && (room != Office || global.Coop.connected))
+    {
+        if (_c.botShotIdx < 0 || current_time - _c.botShotAt > 5000)
+        {
+            _c.botShotIdx++;
+            _c.botShotAt = current_time;
+            BotShotLogged = false;
+            global.CoopUI.forceMode = -1;
+            if (_c.botShotIdx >= array_length(_c.botShots)) { _c.botShots = []; _c.botShot = ""; global.CoopUI.show = true; global.CoopUI.corner = 0; coop_log("SHOTS DONE"); }
+            else { _c.botShot = _c.botShots[_c.botShotIdx]; coop_bot_shot_begin(_c.botShot); }
+        }
+        if (_c.botShot != "") { coop_bot_shot_hold(_c.botShot); }
+        if (_c.botShot != "" && !BotShotLogged && current_time - _c.botShotAt > 2500) { BotShotLogged = true; coop_log("SHOT " + _c.botShot); }
+    }
     // bot: skip the warning screen the same way pressing space does
     if (room == WarningScreen && BotTimer > 90 && !BotSkippedWarning)
     {
@@ -65,12 +105,13 @@ if (_c.bot)
     {
         AutoNightDone = true;
         global.Night = _c.autoNight;
+        coop_prepare_night();
         coop_log("bot: auto-start night " + string(_c.autoNight));
         room_goto(NightOpening);
     }
 }
 // --- menu (F8, not during a night) ---
-if (keyboard_check_pressed(vk_f8) && room != Office) { _c.menuOpen = !_c.menuOpen; _c.focus = 0; }
+if (keyboard_check_pressed(vk_f8) && room != Office && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op")) { _c.menuOpen = !_c.menuOpen; _c.focus = 0; }
 if (_c.menuOpen && room == Office) { _c.menuOpen = false; }
 if (_c.menuOpen)
 {

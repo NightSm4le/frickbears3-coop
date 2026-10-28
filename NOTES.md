@@ -77,3 +77,11 @@ Night win: night passes for both if at least one survives to 6 AM (spectator mod
 - night follow on client (global.Night alone may be insufficient for story nights / Custom Night setup), -coop-autonight path.
 - menu input: game also receives the keys/clicks while menu is open (no input blocking yet); font global.FontW97White rendering.
 - Two instances on one PC share the save dir (%LOCALAPPDATA%\Frickbears3 or Wine equivalent) — client save block protects progress; logs need distinct -coop-log names.
+
+## Stage 3 — shared animatronics (2026-10-28)
+Hooks (apply.csx): jumpscare -> coop_jumpscare_gate; block_tokens -> coop_on_block; occupy_doorway -> coop_on_occupy; oCamera Usage += coop_gen_extra(); title menu "Co-op".
+Door path check: kills go through jumpscare(), door blocks through block_tokens (both hooked, seen in logs). occupy_doorway is NOT called by Bonnie/Chica/Withered Chica/Marionette in tests (occupy=0) — hook kept, not relied on.
+Fixes: global.Deaths is 0 when a night starts outside New Game/Continue -> coop_prepare_night() makes it an array (fixed Code Error in count_jumpscare / oNightClear). UnknownEnum ids are int64 -> is_numeric, not is_real. Token TIMEOUT runs even when host is dying/link silent; coop_drop_partner releases client tokens.
+Results: qa/stage3_run1..3 logs+png. PASS: roster, advance, lure, shared generator, token claim/grant/deny, repelled->partner w/ alert, vent redirect, killer + aggro alert, jumpscare gate, TIMEOUT (client SIGSTOP), client save blocked, no Code Error.
+Known: client GameOver on death (observer mode not implemented yet); aggro capped at AI 20; overlay BR corner overlaps subtitle band, BL covers poster; Wine timer ~0.3x with two copies.
+Bot flags: -coop-botai id=lvl,... -coop-botdoors 0|1 -coop-botcam -coop-botrepel N -coop-botkick S -coop-botlure S -coop-botshots a,b,...

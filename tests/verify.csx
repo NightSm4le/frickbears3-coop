@@ -16,5 +16,15 @@ if (stage == "full")
     need(dec.Split("coop_block_save").Length - 1 == 3, "save guards != 3");
     var sgm = new Underanalyzer.Decompiler.DecompileContext(new UndertaleModLib.Decompiler.GlobalDecompileContext(Data), Data.Code.ByName("gml_Object_oSuperGameManager_Create_0"), Data.ToolInfo.DecompilerSettings).DecompileToString();
     need(sgm.Contains("oCoopNet"), "spawn hook missing");
+    foreach (var n in new[] { "gml_GlobalScript_CoopAnim", "gml_GlobalScript_CoopUI", "gml_Object_oCoopNet_Step_2" })
+        need(Data.Code.ByName(n) != null, n + " missing");
+    string D(string n) => new Underanalyzer.Decompiler.DecompileContext(new UndertaleModLib.Decompiler.GlobalDecompileContext(Data), Data.Code.ByName(n), Data.ToolInfo.DecompilerSettings).DecompileToString();
+    var ss = D("gml_GlobalScript_SimpleScripts");
+    need(ss.Contains("coop_jumpscare_gate(arg0)"), "jumpscare gate missing");
+    need(ss.Contains("coop_on_block("), "block_tokens hook missing");
+    need(ss.Contains("coop_on_occupy("), "occupy hook missing");
+    need(D("gml_Object_oCamera_Step_0").Contains("coop_gen_extra()"), "generator hook missing");
+    need(D("gml_Object_oTitleMenu_Create_0").Split("\"Co-op\"").Length - 1 >= 3, "title Co-op entries missing");
+    need(D("gml_Object_oTitleMenu_Step_0").Contains("coop_title_select()"), "title select hook missing");
 }
 Console.WriteLine(bad.Count == 0 ? "VERIFY OK " + stage : "VERIFY FAIL: " + string.Join("; ", bad));

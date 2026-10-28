@@ -42,6 +42,26 @@ if (stage == "full")
     }
     // host: report night win to the partner
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function win_night()\n{", "function win_night()\n{\n    coop_on_win_night();");
+    // stage 3: shared animatronics
+    g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function jumpscare(arg0, arg1 = 0, arg2 = 0, arg3 = true, arg4 = true)\n{",
+        "function jumpscare(arg0, arg1 = 0, arg2 = 0, arg3 = true, arg4 = true)\n{\n    if (coop_jumpscare_gate(arg0)) { exit; }");
+    g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function block_tokens(arg0 = 1)\n{",
+        "function block_tokens(arg0 = 1)\n{\n    try { coop_on_block(id); } catch (_coopErr) { }");
+    g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function occupy_doorway(arg0, arg1)\n{",
+        "function occupy_doorway(arg0, arg1)\n{\n    coop_on_occupy(arg0, arg1);");
+    g.QueueFindReplace("gml_Object_oCamera_Step_0", "Usage = global.CamUp + global.Doors[0] + global.Doors[1] + global.Flashlight + global.Fan;",
+        "Usage = global.CamUp + global.Doors[0] + global.Doors[1] + global.Flashlight + global.Fan + coop_gen_extra();");
+    // title menu: real "Co-op" entry before "Quit Game" + its own screen, rendered by the game's own menu code
+    g.QueueFindReplace("gml_Object_oTitleMenu_Create_0", "array_push(CurrentOptions, \"Quit Game\");",
+        "array_push(CurrentOptions, \"Co-op\");\n                array_push(CurrentOptions, \"Quit Game\");");
+    g.QueueFindReplace("gml_Object_oTitleMenu_Create_0", "case \"Null\":",
+        "case \"Co-op\":\n            CurrentOptions = coop_title_options();\n            CurrentDesc = coop_title_desc();\n            break;\n        case \"Null\":");
+    g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "var Selection = CurrentOptions[SelectedOption];",
+        "var Selection = CurrentOptions[SelectedOption];\n    if (CurMenu == \"Co-op\") { Selection = \"__coop\"; }");
+    g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "case \"Back\":",
+        "case \"__coop\":\n            coop_title_select();\n            break;\n        case \"Co-op\":\n            goto_menu(\"Co-op\", 0);\n            break;\n        case \"Back\":");
+    g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "if (input_check_pressed(UnknownEnum.Value_1) && !Transitioning && CurMenu != \"Remap In Progress\")",
+        "if (CurMenu == \"Co-op\" && input_check_pressed(UnknownEnum.Value_1) && !Transitioning)\n{\n    audio_play_sound(sfxBump, 5, false);\n    coop_title_back();\n    input_clear(UnknownEnum.Value_1);\n}\nif (input_check_pressed(UnknownEnum.Value_1) && !Transitioning && CurMenu != \"Remap In Progress\")");
 }
 
 var res = g.Import();
