@@ -737,6 +737,7 @@ function coop_more_bot()
         coop_log("bot: FORCED purchase of upgrade 1 for $1 (money " + string(_before) + " -> " + string(global.RunEarnings) + ")");
     }
     // settings screen screenshots
+    if (_X.botSet >= 0 && !_X.botSetDone && room == TitleScreenMap && !instance_exists(oTitleMenu)) { coop_bot_shot_hold(""); }
     if (_X.botSet >= 0 && !_X.botSetDone && room == TitleScreenMap && instance_exists(oTitleMenu) && oCoopNet.BotTimer > 200 + _X.botSet * 60)
     {
         if (_X.botSetStep == 0) { with (oTitleMenu) { PreviousOptions = CurrentOptions; goto_menu("Co-op Settings", 0); } _X.botSetAt = current_time; _X.botSetStep = 1; coop_log("bot: open Co-op Settings"); }
