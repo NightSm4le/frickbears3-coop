@@ -738,7 +738,7 @@ function coop_more_bot()
         coop_log("bot: FORCED purchase of upgrade 1 for $1 (money " + string(_before) + " -> " + string(global.RunEarnings) + ")");
     }
     // partner reached 6 AM while I am still alive in my office (clock drift / forced win): clear the night here too
-    if (room == Office && _c.connected && _c.partnerWon && string(_c.partnerWonNight) == string(global.Night) && coop_alive() && is_numeric(global.Night))
+    if (room == Office && _c.connected && _c.partnerWon && string(_c.partnerWonNight) == string(global.Night) && coop_alive() && (is_numeric(global.Night) || global.Night == "Custom" || global.Night == "Endless"))
     {
         if (_X.pwAt == 0) { _X.pwAt = current_time; }
         else if (_X.pwAt > 0 && current_time - _X.pwAt > 4000) { _X.pwAt = -1; coop_log("partner reached 6AM 4s ago, I am alive -> win_night here too (timer " + string(global.Timer) + ")"); win_night(); }

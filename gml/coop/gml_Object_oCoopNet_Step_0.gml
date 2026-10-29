@@ -19,6 +19,7 @@ if (room != _c.prevRoom)
     coop_log("room " + room_get_name(room));
     if (_c.prevRoom == Office) { coop_anim_night_end(); }
     if (room == NightOpening) { coop_score_reset(); BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0 fix: stale 6AM flag from the previous night
+    if (room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0: Endless rounds skip NightOpening
     if (room == Office) { coop_anim_night_start(); coop_feat_office_enter(); global.CoopS.hintUntil = current_time + 8000; global.CoopS.botDieDone = false; global.CoopS.botHelpStep = 0; }
     if (coop_is_host() && _c.connected && room == NightOpening) { coop_send(coop_night_payload()); }
     else if (coop_is_host() && _c.connected && room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { coop_send(coop_night_payload()); coop_log("ENDLESS: night payload sent on Office entry (round " + string(global.EndlessRound) + ")"); }
@@ -60,7 +61,8 @@ if (_c.bot)
         audio_play_sound(sfxDoor, 10, false);
         coop_log("bot: closed both doors at timer " + string(global.Timer));
     }
-    if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && global.Timer >= _c.botWin)
+    BotOfficeFrames = (room == Office) ? BotOfficeFrames + 1 : 0;
+    if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && (is_real(global.Night) ? global.Timer >= _c.botWin : BotOfficeFrames >= _c.botWin * 60)) // 0.6.0: Custom/Endless timer is not a 0-based clock -> use seconds in Office
     {
         BotWinDone = true;
         coop_log("bot: forcing win_night at timer " + string(global.Timer));

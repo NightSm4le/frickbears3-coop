@@ -7,6 +7,7 @@ BotTimer = 0;
 AutoNightDone = false;
 BotSkippedWarning = false;
 BotWinDone = false;
+BotOfficeFrames = 0;
 BotDoorsDone = false;
 DrawCount = 0;
 IpText = _c.ip;
