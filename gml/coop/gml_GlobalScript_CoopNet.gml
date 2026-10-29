@@ -22,6 +22,7 @@ global.Coop = {
     hostTimer: -1,
     hostNight: undefined,
     partnerWon: false,
+    partnerWonNight: undefined,
     menuOpen: false,
     focus: 0,             // 0 none, 1 ip, 2 port
     prevRoom: -1,
@@ -38,6 +39,9 @@ global.Coop = {
     pingsIn: 0,
     botPing: false,
     botWin: -1,
+    botEndless: false,
+    botCustom: -1,
+    botPhony: false,
     botDoors: -1,
     botAI: [],            // [[id, level], ...]
     botCam: false,
@@ -78,6 +82,9 @@ function coop_parse_args()
         else if (_p == "-coop-log" && i + 1 < _n) { i++; _c.logFile = parameter_string(i); }
         else if (_p == "-coop-botping") { _c.botPing = true; }
         else if (_p == "-coop-botdoors" && i + 1 < _n) { i++; _c.botDoors = real(parameter_string(i)); }
+        else if (_p == "-coop-botendless") { _c.botEndless = true; }
+        else if (_p == "-coop-botphony") { _c.botPhony = true; }
+        else if (_p == "-coop-botcustom" && i + 1 < _n) { i++; _c.botCustom = real(parameter_string(i)); }
         else if (_p == "-coop-botwin" && i + 1 < _n) { i++; _c.botWin = real(parameter_string(i)); }
         else if (_p == "-coop-botai" && i + 1 < _n)
         {
@@ -182,6 +189,20 @@ function coop_night_payload()
     if (variable_global_exists("AILevels")) { _m.ai = global.AILevels; }
     if (variable_global_exists("NightSpeedup")) { _m.speedup = global.NightSpeedup; }
     if (variable_global_exists("ShuffleMode")) { _m.shuffle = global.ShuffleMode; }
+    if (is_numeric(global.Night))
+    {
+        // 0.6.0: one roster for both offices (shared animatronics need the same AllTimeSalvages/SalvagedScraps on both sides)
+        if (variable_global_exists("AllTimeSalvages")) { _m.salv = global.AllTimeSalvages; }
+        if (variable_global_exists("SalvagedScraps")) { _m.scraps = global.SalvagedScraps; }
+    }
+    if (global.Night == "Custom" && variable_global_exists("Cheats")) { _m.cheats = global.Cheats; }
+    if (global.Night == "Endless")
+    {
+        // 0.6.0: Endless goes picker -> Office directly (no NightOpening); client mirrors round/guard/salvages
+        if (variable_global_exists("AllTimeSalvages")) { _m.salv = global.AllTimeSalvages; }
+        if (variable_global_exists("EndlessRound")) { _m.round = global.EndlessRound; }
+        if (variable_global_exists("Guard")) { _m.guard = global.Guard; }
+    }
     if (global.Night == 6 || global.Night == "Custom")
     {
         if (variable_global_exists("Route")) { _m.route = global.Route; }
@@ -242,9 +263,29 @@ function coop_on_packet(_m)
                 if (_m.night == "Custom") { global.Upgrades = []; global.SavedBossTime = 0; global.SummonedAnimatronics = []; global.Challenge = undefined; global.ChallengeTitle = "None"; global.CustomNightMusic = undefined; if (!variable_global_exists("Cheats")) { global.Cheats = array_create(10, false); } }
                 coop_log("BOSS: route " + string(_m.route) + " phase " + (variable_global_exists("BossPhase") ? string(global.BossPhase) : "-") + " from host (boss_fight=" + string(boss_fight_night()) + ")");
             }
+            if (is_numeric(_m.night))
+            {
+                if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; }
+                if (variable_struct_exists(_m, "scraps")) { global.SalvagedScraps = _m.scraps; }
+                coop_log("ROSTER: " + string(variable_struct_exists(_m, "salv") ? array_length(_m.salv) : -1) + " salvaged animatronics from host");
+            }
+            if (variable_struct_exists(_m, "cheats")) { global.Cheats = _m.cheats; }
+            if (_m.night == "Endless")
+            {
+                var _dif = global.Difficulty;
+                var _fresh = !variable_global_exists("EndlessInventory") || !variable_global_exists("EndlessRound") || (variable_struct_exists(_m, "round") && _m.round <= 1);
+                if (_fresh) { initialize_endless_data(); }
+                global.Night = "Endless"; global.Difficulty = _dif;
+                if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; }
+                if (variable_struct_exists(_m, "round")) { global.EndlessRound = _m.round; }
+                if (variable_struct_exists(_m, "guard")) { global.Guard = _m.guard; if (_fresh) { global.Lives = array_create(3, global.Guard); } }
+                global.AILevels = array_create(201, 0);
+                coop_log("ENDLESS: round " + string(global.EndlessRound) + " guard " + string(global.Guard) + " salvages " + string(array_length(global.AllTimeSalvages)) + " from host");
+            }
             coop_log("ECON: difficulty " + string(global.Difficulty) + " from host (one difficulty for both)");
             coop_log("host started night " + string(global.Night));
-            if (room != NightOpening && room != Office) { room_goto(NightOpening); }
+            if (_m.night == "Endless") { if (room != Office) { room_goto(Office); } }
+            else if (room != NightOpening && room != Office) { room_goto(NightOpening); }
             break;
         case "clock": // client: host is the clock authority
             _c.hostTimer = variable_struct_get(_m, "timer");
@@ -277,6 +318,7 @@ function coop_on_packet(_m)
             break;
         case "win":
             _c.partnerWon = true;
+            _c.partnerWonNight = variable_struct_get(_m, "night");
             if (variable_struct_exists(_m, "er")) { global.CoopE.partnerEr = _m.er; coop_log("ECON: partner's night earnings " + string(_m.er)); }
             coop_log("partner reached 6AM (night " + string(variable_struct_get(_m, "night")) + ")");
             if (_c.bot && room == Office && coop_alive()) { global.CoopS.shotPend = "overlay_survived"; global.CoopS.shotAt = current_time + 2500; }

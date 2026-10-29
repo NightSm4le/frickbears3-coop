@@ -18,9 +18,10 @@ if (room != _c.prevRoom)
 {
     coop_log("room " + room_get_name(room));
     if (_c.prevRoom == Office) { coop_anim_night_end(); }
-    if (room == NightOpening) { coop_score_reset(); }
+    if (room == NightOpening) { coop_score_reset(); BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0 fix: stale 6AM flag from the previous night
     if (room == Office) { coop_anim_night_start(); coop_feat_office_enter(); global.CoopS.hintUntil = current_time + 8000; global.CoopS.botDieDone = false; global.CoopS.botHelpStep = 0; }
     if (coop_is_host() && _c.connected && room == NightOpening) { coop_send(coop_night_payload()); }
+    else if (coop_is_host() && _c.connected && room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { coop_send(coop_night_payload()); coop_log("ENDLESS: night payload sent on Office entry (round " + string(global.EndlessRound) + ")"); }
     _c.prevRoom = room;
 }
 if (coop_is_host() && _c.connected && room == Office && current_time - _c.lastClockSend > 500)
@@ -105,6 +106,32 @@ if (_c.bot)
         coop_log("bot: skip warning screen");
         apply_settings(false);
         room_goto(TitleScreenMap);
+    }
+    if (coop_is_host() && _c.connected && (_c.botEndless || _c.botCustom >= 0) && !AutoNightDone && BotTimer > 180 && room == TitleScreenMap)
+    {
+        AutoNightDone = true;
+        if (_c.botEndless)
+        {
+            // FLAGGED: same globals the Endless difficulty/animatronic pickers set (guard 0, 3 lives, salvages 16,0,1,2)
+            initialize_endless_data();
+            global.Night = "Endless"; global.NightSpeedup = 3; global.Guard = 0; global.Lives = [0, 0, 0]; global.RunTime = 0;
+            global.AllTimeSalvages = [16, 0, 1, 2]; global.AILevels = array_create(201, 0);
+            coop_prepare_night();
+            coop_log("bot: ENDLESS round 1 (picker skipped) -> Office");
+            room_goto(Office);
+        }
+        else
+        {
+            // FLAGGED: like oCustomNightSetButton.start_night with Freddy/Bonnie/Chica/Foxy at the given level
+            global.Night = "Custom"; global.Route = 0; global.SummonedAnimatronics = []; reset_challenge_alterations(false); global.Challenge = undefined; global.ChallengeTitle = "None";
+            global.CustomNightMusic = undefined; global.NightSpeedup = 1; global.Upgrades = []; global.SavedBossTime = 0;
+            if (!variable_global_exists("Cheats")) { global.Cheats = array_create(10, false); }
+            global.AILevels = array_create(201, 0); global.AILevels[0] = _c.botCustom; global.AILevels[1] = _c.botCustom; global.AILevels[2] = _c.botCustom; global.AILevels[3] = _c.botCustom;
+            global.Cheats = array_create(10, false); if (_c.botPhony) { global.Cheats[7] = true; coop_log("bot: cheat 7 (Fredbear mode) -> Phony Fredbear/Crony on route 0"); }
+            coop_prepare_night();
+            coop_log("bot: CUSTOM NIGHT AI " + string(_c.botCustom) + " for ids 0-3");
+            room_goto(NightOpening);
+        }
     }
     if (coop_is_host() && _c.connected && _c.autoNight >= 0 && !AutoNightDone && BotTimer > 180 && room != StartupRoom && room != WarningScreen)
     {
