@@ -20,7 +20,7 @@ global.CoopM = { sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meC
     caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
     logAt: 0, followed: false, shotAt: 0, targetLog: "" };
 global.CoopE = { pMoney: -1, pBuys: [], buysIn: 0, buysOut: 0, partnerEr: -1, botBuy: -1, botBuyDone: false, shown: 0 };
-global.CoopMore = { officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
+global.CoopMore = { pwAt: 0, botAdv: -1, botAdvAt: 0, roomAt: 0, officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
 
 function coop_more_parse_args()
 {
@@ -38,6 +38,7 @@ function coop_more_parse_args()
         else if (_p == "-coop-botmazeexit") { i++; _M.botExit = real(_v); }
         else if (_p == "-coop-botmazespawn") { i++; _M.botSpawn = real(_v); }
         else if (_p == "-coop-botbuy") { i++; _E.botBuy = real(_v); }
+        else if (_p == "-coop-botadvance") { i++; global.CoopMore.botAdv = real(_v); }
         else if (_p == "-coop-botsettings") { i++; global.CoopMore.botSet = real(_v); }
         else if (_p == "-coop-mask") { i++; global.CoopCfg.mask = clamp(real(_v), 0, 2); global.CoopCfg.loaded = true; }
     }
@@ -695,7 +696,7 @@ function coop_more_bot()
         room_goto(_rooms[_M.botMaze - 1]);
     }
     // maze dialogs (FLAGGED: the bot "presses" forward like input_check_pressed(0) in oTextBox.draw_everything)
-    if (_M.botMaze >= 0 || _M.botFace >= 0 || _M.botApproach >= 0) { if (coop_is_maze_room(room) && instance_exists(oTextBox) && current_time - _M.botTxtAt > 700) { _M.botTxtAt = current_time; coop_bot_textbox_forward(); } }
+    if (_M.botMaze >= 0 || _M.botFace >= 0 || _M.botApproach >= 0 || global.CoopMore.botAdv >= 0) { if (coop_is_maze_room(room) && instance_exists(oTextBox) && current_time - _M.botTxtAt > 700) { _M.botTxtAt = current_time; coop_bot_textbox_forward(); } }
     if (_M.sync && instance_exists(oCamera3DMaze) && !instance_exists(oTextBox))
     {
         var _t = oCamera3DMaze.Frame; // not a clock; use time in room
@@ -718,7 +719,7 @@ function coop_more_bot()
             if (_ne != noone) { _M.botApproachDone = true; oCamera3DMaze.x = _ne.x + 40; oCamera3DMaze.y = _ne.y; coop_log("bot: FORCED teleport 40 px from enemy at " + string(round(_ne.x)) + "," + string(round(_ne.y))); }
         }
         if (_M.botSpawn >= 0 && coop_is_host() && !_M.botSpawnDone && _sec >= _M.botSpawn && instance_number(oMazeEnemy) == 0) { _M.botSpawnDone = true; coop_maze_spawn_enemies("bot: FORCED, as TakeMask does, without the palette/wall change"); }
-        if (_M.botExit >= 0 && coop_is_host() && !_M.botExitDone && _sec >= _M.botExit)
+        if (_M.botExit >= 0 && !_M.botExitDone && _sec >= _M.botExit)
         {
             _M.botExitDone = true;
             coop_log("bot: FORCED maze exit (same as Psychic Fredbear 'quit': oTransitionMinigame -> SalvageResults)");
@@ -736,6 +737,15 @@ function coop_more_bot()
         acquire_upgrade(1);
         coop_log("bot: FORCED purchase of upgrade 1 for $1 (money " + string(_before) + " -> " + string(global.RunEarnings) + ")");
     }
+    // partner reached 6 AM while I am still alive in my office (clock drift / forced win): clear the night here too
+    if (room == Office && _c.connected && _c.partnerWon && coop_alive() && is_numeric(global.Night))
+    {
+        if (_X.pwAt == 0) { _X.pwAt = current_time; }
+        else if (_X.pwAt > 0 && current_time - _X.pwAt > 4000) { _X.pwAt = -1; coop_log("partner reached 6AM 4s ago, I am alive -> win_night here too (timer " + string(global.Timer) + ")"); win_night(); }
+    }
+    else if (room != Office) { _X.pwAt = 0; }
+    // playthrough bot (FLAGGED): auto-advance story textboxes outside Office/maze, every botAdv ms
+    if (_X.botAdv >= 0 && room != Office && !coop_is_maze_room(room) && instance_exists(oTextBox) && current_time - _X.botAdvAt > max(300, _X.botAdv)) { _X.botAdvAt = current_time; coop_bot_textbox_forward(); }
     // settings screen screenshots
     if (_X.botSet >= 0 && !_X.botSetDone && room == TitleScreenMap && !instance_exists(oTitleMenu)) { coop_bot_shot_hold(""); }
     if (_X.botSet >= 0 && !_X.botSetDone && room == TitleScreenMap && instance_exists(oTitleMenu) && oCoopNet.BotTimer > 200 + _X.botSet * 60)
