@@ -87,6 +87,10 @@ if (stage == "full")
     g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "RoomDestination = global.StartRoom;", "RoomDestination = global.StartRoom;\n            coop_sync_menu(\"cont\", 0);");
     g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "case \"Quit to Menu\":\n            Transitioning = true;", "case \"Quit to Menu\":\n            Transitioning = true;\n            coop_sync_menu(\"quit\", 0);");
     g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "if (TransitionFrame >= 60)\n{", "if (Transitioning && TransitionFrame == 1)\n{\n    coop_sync_menu(\"room\", RoomDestination);\n}\nif (TransitionFrame >= 60)\n{");
+    // 0.6.2: no "RAGE: n" stdout spam every frame; Phone Guy subtitles centred on the camera feed while the monitor is up (not over the cam map)
+    g.QueueFindReplace("gml_Object_oHappyFrog_Draw_77", "show_debug_message($\"RAGE: {KillTimer}\");", "// 0.6.2: RAGE debug print removed");
+    g.QueueFindReplace("gml_Object_oPhoneGuy_Draw_77", "draw_text_ext(320 + round(lengthdir_x(1, FontDirection)), 300 + round(lengthdir_y(1, FontDirection)), Text, 15, 400);", "draw_text_ext(coop_sub_x() + round(lengthdir_x(1, FontDirection)), 300 + round(lengthdir_y(1, FontDirection)), Text, 15, coop_sub_w());");
+    g.QueueFindReplace("gml_Object_oPhoneGuy_Draw_77", "draw_text_ext(320, 300, Text, 15, 400);", "draw_text_ext(coop_sub_x(), 300, Text, 15, coop_sub_w());");
 }
 
 var res = g.Import();

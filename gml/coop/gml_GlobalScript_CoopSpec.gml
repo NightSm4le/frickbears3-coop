@@ -276,6 +276,7 @@ function coop_help_do(_what, _src)
         case "give":
             if (_now < _s.cdGive) { coop_alert("Give power: cooldown " + string(ceil((_s.cdGive - _now) / 1000)) + "s", c_gray, undefined); return false; }
             if (global.Power < 15) { coop_alert("Give power: need 15%+", c_gray, undefined); return false; }
+            var _ppw = coop_partner_get("pw", -1); var _pmax = coop_partner_get("pmax", 100); if (is_real(_ppw) && is_real(_pmax) && _ppw >= _pmax - 0.5) { coop_alert("Give power: partner's power is full", c_gray, undefined); coop_log("help: give skipped, partner power " + string(_ppw)); return false; } // 0.6.2
             global.Power -= 10; _s.cdGive = _now + 20000; _s.st.give++; global.CoopF.sc.give += 10;
             coop_send({ t: "give", amt: 10 });
             coop_alert("Sent 10% power to partner", c_lime, sfxBitCollect);
@@ -311,7 +312,7 @@ function coop_help_packet(_t, _m)
             var _old = global.Power;
             global.Power = min(global.Power + _m.amt, max(coop_help_power_max(), global.Power));
             var _got = global.Power - _old;
-            coop_alert("Partner sent you +" + string(round(_got)) + "% power", c_lime, sfxBitCollect);
+            if (round(_got) >= 1) { coop_alert("Partner sent you +" + string(round(_got)) + "% power", c_lime, sfxBitCollect); } // 0.6.2: no "+0%" alert
             coop_log("help: got power " + string(_old) + " -> " + string(global.Power));
             if (_got < _m.amt) { coop_send({ t: "helpack", what: "give", ok: 0, amt: _m.amt - _got }); }
             return true;
@@ -364,7 +365,7 @@ function coop_help_step()
     if (_s.botHelp >= 0 && global.Timer >= _s.botHelp && _s.botHelpStep < 4 && current_time - _s.botHelpAt > 16000 && coop_partner_alive_in_office())
     {
         _s.botHelpAt = current_time;
-        if (!_s.btnShot) { _s.btnShot = true; coop_log("SHOT help_buttons"); return; }
+        if (!_s.btnShot && _s.botHelpStep == 1) { _s.btnShot = true; coop_log("SHOT help_buttons"); return; } // 0.6.2: give first, while the partner still has full power
         var _acts = ["give", "warn", "lure", "warn"];
         coop_log("bot: help " + _acts[_s.botHelpStep]);
         coop_help_do(_acts[_s.botHelpStep], "bot");
@@ -393,11 +394,15 @@ function coop_help_click()
 {
     var _u = global.CoopUI;
     if (room != Office || !global.Coop.connected || !coop_alive() || !variable_struct_exists(_u, "btns")) { return; }
-    if (!mouse_check_button_pressed(mb_left)) { return; }
+    // 0.6.2: press + same-frame hit test; a press that missed is retried on release (cursor not updated yet in that frame)
+    var _press = mouse_check_button_pressed(mb_left), _rel = mouse_check_button_released(mb_left) && variable_struct_exists(_u, "btnMiss") && _u.btnMiss;
+    if (!_press && !_rel) { return; }
+    _u.btnMiss = false;
     var _mx = device_mouse_x_to_gui(0), _my = device_mouse_y_to_gui(0);
     for (var i = 0; i < array_length(_u.btns); i++)
     {
         var _b = _u.btns[i];
-        if (point_in_rectangle(_mx, _my, _b[0], _b[1], _b[2], _b[3])) { coop_help_do(_b[4], "button"); mouse_clear(mb_left); return; }
+        if (point_in_rectangle(_mx, _my, _b[0], _b[1], _b[2], _b[3])) { coop_help_do(_b[4], _press ? "button" : "button (release)"); mouse_clear(mb_left); return; }
     }
+    if (_press) { _u.btnMiss = true; }
 }

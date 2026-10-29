@@ -70,10 +70,15 @@ function coop_draw_overlay()
     var _st = coop_partner_state_text();
     var _pw = coop_partner_get("pw", 0);
     var _gw = display_get_gui_width(), _gh = display_get_gui_height();
-    var _hb = _mode == 0 && coop_partner_fresh() && !coop_partner_get("sp", 0) && coop_alive();
+    // 0.6.2: on the camera / vent monitor the full panel (with G/H/L) goes into the empty grey strip above the feed
+    // (x 244..548, y 3..28: right of the map title, left of Tokens) instead of the clipped pill under Tokens
+    var _strip = _mode == 1 && _u.forceMode < 0 && global.CamUp && !global.PanelUp && variable_global_exists("MonitorSystem") && (global.MonitorSystem == "Cameras" || global.MonitorSystem == "Vents");
+    _u.strip = _strip;
+    var _hb = (_mode == 0 || _strip) && coop_partner_fresh() && !coop_partner_get("sp", 0) && coop_alive();
     var _w = (_mode == 0) ? 116 : 70, _h = (_mode == 0) ? (_hb ? 48 : 30) : 14;
     var _px, _py;
-    switch (_u.corner)
+    if (_strip) { _w = 304; _h = 25; _px = 244; _py = 3; }
+    else switch (_u.corner)
     {
         case 0: _px = _gw - _w - 4; _py = 22; break;             // top-right, under Tokens
         case 1: _px = 4; _py = 44; break;                        // top-left, under the clock
@@ -89,8 +94,22 @@ function coop_draw_overlay()
         draw_set_alpha(0.85);
         var _txt = "P" + string(coop_partner_slot()) + " ";
         var _isz = (_mode == 0) ? 24 : 14;
-        coop_art_partner_portrait((_px > 40) ? _px - _isz - 2 : _px + _w + 2, _py, _isz, 1);
+        if (!_strip) { coop_art_partner_portrait((_px > 40) ? _px - _isz - 2 : _px + _w + 2, _py, _isz, 1); }
         if (_st[0] != "") { draw_set_color(_st[1]); draw_text(_px + 3, _py + 1, _txt + _st[0]); }
+        else if (_strip)
+        {
+            draw_set_color(c_white); draw_text(_px + 3, _py + 1, _txt + string(floor(max(_pw, 0))) + "%");
+            draw_set_color(c_dkgray); draw_rectangle(_px + 56, _py + 5, _px + 140, _py + 10, false);
+            draw_set_color(_pw > 25 ? c_lime : c_red); draw_rectangle(_px + 56, _py + 5, _px + 56 + 84 * clamp(_pw, 0, 100) / 100, _py + 10, false);
+            draw_set_color(coop_partner_get("d0", 0) ? c_red : c_dkgray); draw_rectangle(_px + 4, _py + 16, _px + 11, _py + 23, false);
+            draw_set_color(coop_partner_get("d1", 0) ? c_red : c_dkgray); draw_rectangle(_px + 14, _py + 16, _px + 21, _py + 23, false);
+            var _sv = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "OFFICE";
+            if (coop_partner_get("mk", 0)) { _sv = "MASK"; }
+            if (coop_partner_get("pu", 0)) { _sv = "PANEL"; }
+            if (coop_partner_get("fan", 0)) { _sv += " FAN"; }
+            draw_set_color(c_white); draw_text(_px + 26, _py + 13, _sv);
+            draw_set_color(c_gray); draw_text(_px + 104, _py + 13, (_c.rtt >= 0) ? string(_c.rtt) + "ms" : "");
+        }
         else if (_mode == 1)
         {
             draw_set_color(c_white); draw_text(_px + 3, _py + 1, _txt + string(floor(max(_pw, 0))) + "%");
@@ -117,7 +136,8 @@ function coop_draw_overlay()
     _u.btns = [];
     if (_mode < 2 && _hb)
     {
-        _u.btns = coop_help_buttons(_px + 2, _py, _w - 4);
+        if (_strip) { _u.btns = coop_help_buttons(_px + 148, _py - 25, 152); } // one row at y _py+6.._py+21, right half of the strip
+        else { _u.btns = coop_help_buttons(_px + 2, _py, _w - 4); }
         var _mx = device_mouse_x_to_gui(0), _my = device_mouse_y_to_gui(0);
         for (var i = 0; i < array_length(_u.btns); i++)
         {
@@ -129,7 +149,7 @@ function coop_draw_overlay()
         draw_set_alpha(1);
     }
     // key hint for the first seconds of a night
-    if (current_time < global.CoopS.hintUntil && coop_alive())
+    if (current_time < global.CoopS.hintUntil && coop_alive() && !(variable_struct_exists(global.CoopUI, "strip") && global.CoopUI.strip)) // 0.6.2: not over the cam map tabs
     {
         var _ht = "CO-OP: P ping G give H warn L lure M mark V revive Tab hide F9 move";
         var _hw = string_width(_ht) + 10;
@@ -152,7 +172,7 @@ function coop_draw_alerts()
     if (_atxt != "")
     {
         var _tw = string_width(_atxt) + 10;
-        var _bx = _gw / 2 - _tw / 2, _by = 26;
+        var _bx = _gw / 2 - _tw / 2, _by = (variable_struct_exists(global.CoopUI, "strip") && global.CoopUI.strip && room == Office) ? 31 : 26; // 0.6.2: below the cam strip
         draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_bx, _by, _bx + _tw, _by + 15, false);
         draw_set_alpha(_blink || !_flash ? 1 : 0.6); draw_set_color(_acol); draw_text(_bx + 5, _by + 1, _atxt);
         draw_set_alpha(1);
@@ -296,3 +316,12 @@ function coop_bot_shot_hold(_n)
         default: global.MouseX = 320;
     }
 }
+
+// 0.6.2: Phone Guy subtitle position (oPhoneGuy Draw GUI, patched in apply.csx). With the camera/vent monitor up the
+// left 240 px are the cam map ("You" marker etc.), so centre the text on the feed (x 240..640) instead of the screen.
+function coop_sub_on_feed()
+{
+    return variable_global_exists("CamUp") && global.CamUp && !(variable_global_exists("PanelUp") && global.PanelUp) && variable_global_exists("MonitorSystem") && (global.MonitorSystem == "Cameras" || global.MonitorSystem == "Vents");
+}
+function coop_sub_x() { return coop_sub_on_feed() ? 442 : 320; }
+function coop_sub_w() { return coop_sub_on_feed() ? 380 : 400; }

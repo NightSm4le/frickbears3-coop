@@ -3,8 +3,13 @@
 // Works through Porthole / any single-port TCP tunnel: client connects to 127.0.0.1:<port>.
 
 global.Coop = {
-    proto: 3,
-    modver: "0.6.1",
+    proto: 4,
+    modver: "0.6.2",
+    rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
+    rjAt: 0,
+    rjN: 0,
+    rjWhy: "",
+    menuMiss: false,
     mode: "off",          // off | host | client
     server: -1,
     sock: -1,             // client: own socket, host: partner socket
@@ -93,6 +98,7 @@ function coop_parse_args()
             for (var k = 0; k < array_length(_parts); k++) { var _kv = string_split(_parts[k], "="); if (array_length(_kv) == 2) { array_push(_c.botAI, [real(_kv[0]), real(_kv[1])]); } }
         }
         else if (_p == "-coop-botcam") { _c.botCam = true; }
+        else if (_p == "-coop-botdrop" && i + 1 < _n) { i++; _c.botDrop = real(parameter_string(i)); } // 0.6.2: client fakes a lost host after N s in the Office
         else if (_p == "-coop-botkick" && i + 1 < _n) { i++; _c.botKick = real(parameter_string(i)); }
         else if (_p == "-coop-botlure" && i + 1 < _n) { i++; _c.botLure = real(parameter_string(i)); }
         else if (_p == "-coop-botrepel" && i + 1 < _n) { i++; global.CoopA.repelChance = real(parameter_string(i)); }
@@ -157,6 +163,13 @@ function coop_join(_ip, _port)
 function coop_disconnect(_why)
 {
     var _c = global.Coop;
+    // 0.6.2: a client that lost the host by timeout / dropped socket retries by itself; any other reason stops retrying
+    if (_c.mode == "client" && _c.connected && (_why == "timeout" || _why == "socket closed"))
+    {
+        _c.rjLeft = 20; _c.rjN = 0; _c.rjAt = current_time + 2000; _c.rjWhy = _why;
+        coop_log("RECONNECT: armed after " + _why + " (20 tries, every ~3 s)");
+    }
+    else if (_why != "rejoin" && _why != "connect failed" && _why != "connect timeout" && _why != "timeout" && _why != "socket closed") { if (_c.rjLeft > 0) { coop_log("RECONNECT: cancelled (" + _why + ")"); } _c.rjLeft = 0; }
     if (_c.connected) { coop_send({ t: "bye", why: _why }); }
     if (_c.sock >= 0) { network_destroy(_c.sock); }
     if (_c.server >= 0) { network_destroy(_c.server); }
@@ -271,6 +284,8 @@ function coop_on_packet(_m)
             if (room == NightOpening || room == Office) { coop_send(coop_night_payload()); }
             break;
         case "welcome": // client side
+            if (_c.rjN > 0) { coop_log("RECONNECT: back online after " + string(_c.rjN) + " tries"); coop_alert("Reconnected to the host", c_lime, undefined); }
+            _c.rjLeft = 0; _c.rjN = 0;
             _c.connected = true;
             _c.status = "connected as player 2";
             coop_log("welcome, slot " + string(variable_struct_get(_m, "slot")));
@@ -294,6 +309,7 @@ function coop_on_packet(_m)
             coop_apply_night(_m);
             global.CoopSync.followAt = current_time;
             if (_m.night == "Endless") { if (room != Office) { room_goto(Office); } }
+            else if (room == Office && _oldNight == _m.night) { coop_log("SYNC: rejoined during night " + string(_m.night) + " -> staying in my office, clock follows the host"); }
             else if (room == NightOpening && _oldNight != _m.night) { coop_log("SYNC: my save had night " + string(_oldNight) + ", host has " + string(_m.night) + " -> restart opening"); room_restart(); }
             else if (room != NightOpening && room != Office) { room_goto(NightOpening); }
             break;
@@ -373,6 +389,7 @@ function coop_snapshot()
     if (room == Office)
     {
         if (variable_global_exists("Power")) { _s.pw = round(global.Power * 10) / 10; }
+        if (room == Office) { _s.pmax = coop_help_power_max(); } // 0.6.2
         if (variable_global_exists("Doors")) { _s.d0 = global.Doors[0] ? 1 : 0; _s.d1 = global.Doors[1] ? 1 : 0; }
         if (variable_global_exists("CamUp")) { _s.cu = global.CamUp ? 1 : 0; }
         if (variable_global_exists("Cam")) { _s.cam = global.Cam; }
@@ -428,8 +445,16 @@ function coop_draw_gui()
     if (variable_global_exists("FontW97White")) { draw_set_font(global.FontW97White); }
     draw_set_halign(fa_left);
     draw_set_valign(fa_top);
+    // 0.6.2: auto-reconnect banner
+    if (_c.rjLeft > 0 || (_c.rjN > 0 && _c.mode == "client" && !_c.connected))
+    {
+        var _bt = "Connection lost - reconnecting... (try " + string(_c.rjN) + "/20)";
+        var _bw = string_width(_bt) + 12, _bx = display_get_gui_width() / 2 - _bw / 2;
+        draw_set_alpha(0.75); draw_set_color(c_black); draw_rectangle(_bx, 46, _bx + _bw, 62, false); draw_set_alpha(1);
+        draw_set_color(c_yellow); draw_text(_bx + 6, 48, _bt); draw_set_color(c_white);
+    }
     // small status line (always, when coop active)
-    if (_c.mode != "off" && !_c.menuOpen && !(room == Office && _c.connected) && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op"))
+    else if (_c.mode != "off" && !_c.menuOpen && !(room == Office && _c.connected) && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op"))
     {
         draw_set_alpha(0.7);
         draw_set_color(c_white);
@@ -473,4 +498,12 @@ function coop_draw_gui()
 function coop_prepare_night()
 {
     if (!is_array(global.Deaths)) { global.Deaths = [0, 0, 0, 0, 0, 0]; coop_log("prepare night: global.Deaths was not an array -> [0,0,0,0,0,0]"); }
+}
+
+
+// 0.6.2: -coop-botdrop N counts real seconds since this client reached the Office (frame counts lie at low fps)
+function coop_bot_drop_due(_c)
+{
+    if (!variable_struct_exists(_c, "botDropAt") || _c.botDropAt < 0) { _c.botDropAt = current_time; }
+    return current_time - _c.botDropAt >= _c.botDrop * 1000;
 }

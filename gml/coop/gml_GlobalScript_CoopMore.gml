@@ -9,8 +9,17 @@ global.CoopCfg = {
     // local
     mask: 0,              // 0 freddy, 1 bonnie, 2 chica (my own mask, sent to the partner)
     partnerMask: 1,
+    partnerMaskRaw: -1,   // 0.6.2: mask the partner chose (partnerMask = what we draw; P2 never looks like P1)
     loaded: false, fromHost: false
 };
+// 0.6.2: P1 keeps its mask; if P2 picked the same one, P2 is shown with the next mask (freddy->bonnie->chica)
+function coop_mask_shown(_slot, _own, _other) { return (_slot == 2 && _own == _other) ? ((_own + 1) mod 3) : _own; }
+function coop_mask_fix()
+{
+    var _g = global.CoopCfg;
+    if (_g.partnerMaskRaw < 0) { return; }
+    _g.partnerMask = coop_mask_shown(coop_partner_slot(), _g.partnerMaskRaw, _g.mask);
+}
 function coop_mask_name(_i) { var _n = ["freddy", "bonnie", "chica"]; return _n[clamp(_i, 0, 2)]; }
 
 global.CoopArt = { tried: false, spr: {} };
@@ -86,8 +95,9 @@ function coop_cfg_apply(_why)
 {
     var _g = global.CoopCfg;
     global.CoopA.repelChance = _g.repel;
+    coop_mask_fix();
     coop_log("CFG (" + _why + "): repel=" + string(_g.repel) + " revives=" + string(_g.revives) + " jd=" + string(_g.jd) + " bossShared=" + string(_g.bossShared)
-        + " maze=" + string(_g.maze) + " specReward=" + string(_g.specReward) + " mask=" + coop_mask_name(_g.mask) + " partnerMask=" + coop_mask_name(_g.partnerMask) + " fromHost=" + string(_g.fromHost));
+        + " maze=" + string(_g.maze) + " specReward=" + string(_g.specReward) + " mask=" + coop_mask_name(_g.mask) + ((_g.partnerMaskRaw >= 0 && coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw) != _g.mask) ? " (shown as " + coop_mask_name(coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw)) + ", same as P1)" : "") + " partnerMask=" + coop_mask_name(_g.partnerMask) + ((_g.partnerMaskRaw >= 0 && _g.partnerMaskRaw != _g.partnerMask) ? " (picked " + coop_mask_name(_g.partnerMaskRaw) + ", same as P1)" : "") + " fromHost=" + string(_g.fromHost));
 }
 
 function coop_cfg_send() { if (global.Coop.connected) { coop_send(coop_cfg_msg()); } }
@@ -102,7 +112,7 @@ function coop_set_options()
         "Boss HP: " + (_g.bossShared ? "SHARED" : "separate") + _h,
         "3D maze together: " + (_g.maze ? "ON" : "OFF") + _h,
         "Spectator reward: " + string(_g.specReward) + "%" + _h,
-        "My mask: " + string_upper(coop_mask_name(_g.mask)),
+        "My mask: " + string_upper(coop_mask_name(_g.mask)) + ((_g.partnerMaskRaw >= 0 && coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw) != _g.mask) ? " (same as P1 -> shown " + string_upper(coop_mask_name(coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw))) + ")" : ""),
         "Back"
     ];
 }
@@ -192,7 +202,7 @@ function coop_more_packet(_t, _m)
     switch (_t)
     {
         case "cfg":
-            _g.partnerMask = clamp(_m.mask, 0, 2);
+            _g.partnerMaskRaw = clamp(_m.mask, 0, 2); // never our own mask
             if (coop_is_client())
             {
                 _g.repel = _m.repel; _g.revives = _m.revives; _g.jd = _m.jd; _g.bossShared = _m.bossShared; _g.maze = _m.maze; _g.specReward = _m.specReward; _g.fromHost = true;
@@ -619,6 +629,7 @@ function coop_econ_draw()
     var _E = global.CoopE, _c = global.Coop;
     if (!_c.connected || room == Office || room == GameOver || coop_is_maze_room(room) || room == StartupRoom || room == WarningScreen) { return; }
     if (_E.pMoney < 0 && array_length(_E.pBuys) == 0) { return; }
+    if (room == NightOpening || instance_exists(oTextBox) || instance_exists(oTextBox_Fredbear)) { return; } // 0.6.2: not over the night card portraits / story
     var _gw = display_get_gui_width();
     var _t = "PARTNER $" + string(_E.pMoney);
     if (array_length(_E.pBuys) > 0) { _t += "  bought: "; for (var i = max(0, array_length(_E.pBuys) - 3); i < array_length(_E.pBuys); i++) { _t += _E.pBuys[i] + ((i < array_length(_E.pBuys) - 1) ? ", " : ""); } }

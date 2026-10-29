@@ -7,10 +7,12 @@ _c.stepAt = current_time;
 if (_c.connected)
 {
     if (current_time - _c.lastPing > 1000) { _c.lastPing = current_time; coop_send({ t: "ping", ts: current_time }); }
-    var _lim = (room == NightOpening || coop_partner_get("rm", "") == "NightOpening") ? 30000 : 10000; // 0.6.1: the Office load after the night card can take long on a slow PC
+    // 0.6.1: the Office load after the night card can take long on a slow PC; 0.6.2: 20 s base (a loaded PC can stall the partner >10 s)
+    var _lim = (room == NightOpening || coop_partner_get("rm", "") == "NightOpening") ? 30000 : 20000;
+    if (_c.bot && variable_struct_exists(_c, "botDrop") && _c.botDrop > 0 && coop_is_client() && room == Office && coop_bot_drop_due(_c)) { _c.botDrop = -1; coop_log("bot: simulate a lost host (no packets for " + string(_lim) + " ms)"); _c.lastRecv = current_time - _lim - 1; }
     if (current_time - _c.lastRecv > _lim)
     {
-        coop_log("timeout");
+        coop_log("timeout (silent " + string(current_time - _c.lastRecv) + " ms, my fps " + string(fps_real) + ")");
         if (coop_is_host()) { coop_drop_partner("timeout"); } else { coop_disconnect("timeout"); }
     }
 }
@@ -18,6 +20,15 @@ else if (coop_is_client() && current_time - _c.lastRecv > 12000)
 {
     coop_disconnect("connect timeout");
 }
+// 0.6.2: auto-reconnect (client)
+if (_c.rjLeft > 0 && _c.mode == "off" && current_time >= _c.rjAt)
+{
+    _c.rjLeft--; _c.rjN++; _c.rjAt = current_time + 3000;
+    coop_log("RECONNECT: try " + string(_c.rjN) + " to " + _c.ip + ":" + string(_c.port));
+    coop_join(_c.ip, _c.port);
+    if (_c.rjLeft <= 0) { _c.rjAt = 0; }
+}
+else if (_c.rjN > 0 && _c.rjLeft <= 0 && _c.mode == "off") { coop_log("RECONNECT: gave up after " + string(_c.rjN) + " tries"); coop_alert("Could not reconnect. F8 -> JOIN to retry", c_red, undefined); _c.rjN = 0; }
 // --- host: night start + clock ---
 if (room != _c.prevRoom)
 {
@@ -158,9 +169,17 @@ if (_c.menuOpen)
     var _mx = device_mouse_x_to_gui(0), _my = device_mouse_y_to_gui(0);
     var _gw = display_get_gui_width(), _gh = display_get_gui_height();
     var _x = _gw / 2 - 150, _y = _gh / 2 - 90;
-    if (mouse_check_button_pressed(mb_left))
+    // 0.6.2: act on the press with a same-frame hit test; if the press missed every control (cursor position not yet
+    // updated when move+click land in one frame, e.g. xdotool / remote desktop), try again on release
+    var _mpress = mouse_check_button_pressed(mb_left), _mrel = mouse_check_button_released(mb_left) && _c.menuMiss;
+    if (_mpress) { _c.menuMiss = false; }
+    if (_mpress || _mrel)
     {
-        if (point_in_rectangle(_mx, _my, _x + 70, _y + 40, _x + 290, _y + 60)) { _c.focus = 1; keyboard_string = IpText; }
+        var _hitAny = point_in_rectangle(_mx, _my, _x + 70, _y + 40, _x + 290, _y + 90) || point_in_rectangle(_mx, _my, _x + 10, _y + 110, _x + 290, _y + 135);
+        if (_mrel) { _c.menuMiss = false; if (_hitAny) { coop_log("F8 menu: click taken on release (press missed)"); } }
+        if (_mpress && !_hitAny) { _c.menuMiss = true; }
+        if (_mrel && !_hitAny) { }
+        else if (point_in_rectangle(_mx, _my, _x + 70, _y + 40, _x + 290, _y + 60)) { _c.focus = 1; keyboard_string = IpText; }
         else if (point_in_rectangle(_mx, _my, _x + 70, _y + 70, _x + 290, _y + 90)) { _c.focus = 2; keyboard_string = PortText; }
         else if (point_in_rectangle(_mx, _my, _x + 10, _y + 110, _x + 100, _y + 135)) { coop_host(real(PortText)); }
         else if (point_in_rectangle(_mx, _my, _x + 105, _y + 110, _x + 195, _y + 135)) { coop_join(IpText, real(PortText)); }

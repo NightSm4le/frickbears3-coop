@@ -27,6 +27,7 @@ function coop_feat_parse_args()
     {
         var _p = parameter_string(i);
         if (_p == "-coop-savetag" && i + 1 < _n) { i++; _f.saveTagArg = "_" + string_lettersdigits(parameter_string(i)); }
+        else if (_p == "-coop-unlockall") { _f.unlockAll = true; } // 0.6.2 tester flag: Extras / Custom Night / bosses unlocked in the CO-OP save only
         else if (_p == "-coop-botmark" && i + 1 < _n) { i++; _f.botMark = real(parameter_string(i)); }
         else if (_p == "-coop-botrevive" && i + 1 < _n) { i++; _f.botRevive = real(parameter_string(i)); }
         else if (_p == "-coop-botjd" && i + 1 < _n) { i++; _f.botJd = real(parameter_string(i)); }
@@ -566,7 +567,8 @@ function coop_feat_packet(_t, _m)
 function coop_feat_step()
 {
     var _f = global.CoopF, _c = global.Coop, _s = global.CoopS;
-    if (global.CoopSaveTag != "" && _c.mode == "off" && room == TitleScreenMap) { coop_save_leave(); }
+    if (global.CoopSaveTag != "" && _c.mode == "off" && _c.rjLeft <= 0 && room == TitleScreenMap) { coop_save_leave(); } // 0.6.2: not while auto-reconnecting
+    if (variable_struct_exists(_f, "unlockAll") && _f.unlockAll && global.CoopSaveTag != "") { coop_unlock_all(); }
     if (!_c.connected) { return; }
     // marks: M on cameras (alive) or as spectator (marks what the partner is watching)
     var _mk = keyboard_check_pressed(ord("M")) && coop_help_key_free(ord("M"));
@@ -608,4 +610,20 @@ function coop_feat_draw()
     coop_revive_draw();
     coop_jd_draw();
     coop_score_draw();
+}
+
+// 0.6.2 tester flag -coop-unlockall: unlocks Extras (UnlockedAnimatronics[128]), Custom Night (any animatronic), the
+// Extras boss menu ([126]) and 4LD Extras (trophy 47) - only while the co-op save copy is active, so the player's own
+// savedata/records are never changed. Re-applied after every save reload (cheap check).
+function coop_unlock_all()
+{
+    if (!variable_global_exists("UnlockedAnimatronics") || !is_array(global.UnlockedAnimatronics)) { return; }
+    var _ua = global.UnlockedAnimatronics, _need = false;
+    for (var i = 0; i < array_length(_ua); i++) { if (!_ua[i]) { _need = true; break; } }
+    if (variable_global_exists("UnlockedTrophies") && is_array(global.UnlockedTrophies) && array_length(global.UnlockedTrophies) > 47 && !global.UnlockedTrophies[47]) { _need = true; }
+    if (!_need) { return; }
+    for (var i = 0; i < array_length(_ua); i++) { _ua[i] = true; }
+    if (variable_global_exists("UnlockedTrophies") && is_array(global.UnlockedTrophies) && array_length(global.UnlockedTrophies) > 47) { global.UnlockedTrophies[47] = true; }
+    coop_log("UNLOCK: -coop-unlockall -> all animatronics + trophy 47 unlocked (co-op save " + global.CoopSaveTag + " only)");
+    if (instance_exists(oTitleMenu)) { with (oTitleMenu) { if (CurMenu == "Title" && !Transitioning) { goto_menu("Title", 0); } } }
 }
