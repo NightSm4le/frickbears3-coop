@@ -22,7 +22,7 @@ global.CoopS = {
     st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, warn: 0, lure: 0, giveIn: 0, warnIn: 0, lureIn: 0, refunds: 0 }
 };
 // [w, h, interval ms]
-#macro COOP_LV [[960, 540, 16], [640, 360, 16], [480, 270, 16], [320, 180, 16], [256, 144, 16]]
+#macro COOP_LV [[1920, 1080, 16], [1280, 720, 16], [960, 540, 16], [640, 360, 16], [480, 270, 16], [320, 180, 16], [256, 144, 16]]
 
 function coop_spec_parse_args()
 {
@@ -159,7 +159,7 @@ function coop_stream_tick()
         _s.kbps = _s.bytesWin / 1024 / ((current_time - _s.lastAdapt) / 1000);
         _s.bytesWin = 0; _s.lastAdapt = current_time;
         var _old = _s.level;
-        if ((_s.lat > 400 || _s.kbps > _s.budget || _inflight >= 24) && _s.level < 4) { _s.level++; _s.st.levelDown++; }
+        if ((_s.lat > 400 || _s.kbps > _s.budget || _inflight >= 24) && _s.level < array_length(_lv) - 1) { _s.level++; _s.st.levelDown++; }
         else if (_s.lat >= 0 && _s.lat < 150 && _inflight < 16 && _s.kbps < _s.budget * 0.5 && _s.level > 0) { _s.level--; _s.st.levelUp++; }
         if (_old != _s.level) { coop_log("stream: level " + string(_old) + " -> " + string(_s.level) + " (" + string(_lv[_s.level][0]) + "x" + string(_lv[_s.level][1]) + " every " + string(_lv[_s.level][2]) + "ms; ack lat " + string(round(_s.lat)) + "ms, " + string_format(_s.kbps, 1, 1) + " KB/s, inflight " + string(_inflight) + ")"); }
     }

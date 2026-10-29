@@ -90,7 +90,7 @@ Bot flags: -coop-botai id=lvl,... -coop-botdoors 0|1 -coop-botcam -coop-botrepel
 Build: sha256 704cb413b9f4a190220ded828b02b6f8c2dff29b228f49f3b0b516e9cfdd0248, VERIFY OK full.
 - Death in coop while partner alive in Office: count_jumpscare skipped (no lives/Deaths spent), oGameOver Create hijacked
   (CoopSpec) -> spectator view: partner's frame streamed over the same TCP socket (binary [u8 1][u32 seq][u16 w][u16 h][u8 lvl][zlib]),
-  per-frame ack, up to 960x540 at a 60 FPS target; resolution adapts down on RTT/in-flight/bandwidth pressure
+  per-frame ack, up to 1920x1080 at a 60 FPS target; resolution adapts down through 1280x720 to 256x144 on RTT/in-flight/bandwidth pressure
   (-coop-budget KB/s, default 65536). FPS targets 60; actual rate depends on both games' render performance and connection stability.
   HUD of partner on top, P = ping. Partner reaches 6 AM -> spectator also gets win_night (normal progress on host).
   Both dead -> skipped death is counted, real GameOver on both.
