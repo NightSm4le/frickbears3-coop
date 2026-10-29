@@ -231,8 +231,16 @@ function coop_maze_spawn_step()
 function coop_maze_look_step()
 {
     var _S = global.CoopS3, _M = global.CoopM;
-    if (_S.lookT < 0 || !_M.sync || !instance_exists(oCamera3DMaze) || instance_exists(oTextBox)) { return; }
+    if (_S.lookT < 0 || !_M.sync || !instance_exists(oCamera3DMaze)) { return; }
     var _sec = (current_time - _S.mzIn) / 1000;
+    if (instance_exists(oTextBox))
+    {
+        // 0.6.4: an NPC dialog kept the client from ever turning (no partner shot): close it 10 s after T (bot flag only)
+        if (_S.lookDone || _sec < _S.lookT + 10) { return; }
+        coop_log("bot: dialog still open " + string(round(_sec)) + " s into the maze -> closed for the partner shot");
+        with (oTextBox) { instance_destroy(); }
+        return;
+    }
     if (!_S.lookDone && _sec >= _S.lookT)
     {
         _S.lookDone = true; _S.lookUntil = current_time + 5000;
@@ -311,6 +319,9 @@ function coop_boss_real_step()
     coop_s3_release_all(); // keys are pressed again below each step while needed
     if (_S.brStart == 0) { _S.brStart = current_time; _S.brHp0 = oSalvage.HP; coop_log("bot: REAL input boss damage starts, Salvage HP " + string_format(oSalvage.HP, 1, 2) + " on cam " + string(oSalvage.CurrentCam)); }
     var _cam = oSalvage.CurrentCam;
+    // 0.6.4: cam 0 = Salvage is IN the office (oSalvageHead behind the wall), there is no camera 0 button
+    // (input 12 + 0 is the turn-around key) -> nothing to light on the cams, wait until it is back on a camera
+    if (_cam < 1) { if (_S.brPhase != 4) { _S.brPhase = 4; coop_log("bot: Salvage is in the office (cam 0, no camera button) -> REAL input waits"); } return; }
     if (!global.CamUp)
     {
         if (_S.brPhase != 1) { _S.brPhase = 1; _S.brAt = current_time; }
@@ -339,7 +350,7 @@ function coop_boss_real_step()
 }
 
 // ================= FLAGGED bot: endings / boss win =================
-// -coop-botending normal|good|evil|money|ultimate|secret (host; the partner jumps too)
+// -coop-botending normal|good|evil|money|ultimate|talbert|secret (host; the partner jumps too)
 function coop_s3_ending_go(_k, _send)
 {
     var _S = global.CoopS3;
@@ -347,9 +358,11 @@ function coop_s3_ending_go(_k, _send)
     if (_send && global.Coop.connected) { coop_send({ t: "s3end", k: _k }); }
     if (!variable_global_exists("SalvagedMasks") || !is_array(global.SalvagedMasks)) { global.SalvagedMasks = array_create(4, 0); }
     if (!variable_global_exists("SalvagedScraps") || !is_array(global.SalvagedScraps)) { global.SalvagedScraps = array_create(4, 0); }
-    for (var i = 0; i < 4; i++) { global.SalvagedMasks[i] = (_k == "good" || _k == "ultimate") ? 1 : 0; global.SalvagedScraps[i] = (_k == "evil" || _k == "ultimate") ? 1 : 0; }
+    // 0.6.4: "talbert" = ultimate route + the Money upgrade (41) -> the original goes to TalbertRoom (Clark's letter)
+    var _ult = (_k == "ultimate" || _k == "talbert");
+    for (var i = 0; i < 4; i++) { global.SalvagedMasks[i] = (_k == "good" || _ult) ? 1 : 0; global.SalvagedScraps[i] = (_k == "evil" || _ult) ? 1 : 0; }
     if (!variable_global_exists("Upgrades") || !is_array(global.Upgrades)) { global.Upgrades = []; }
-    if (_k == "money" && !has_upgrade(41)) { array_push(global.Upgrades, 41); }
+    if ((_k == "money" || _k == "talbert") && !has_upgrade(41)) { array_push(global.Upgrades, 41); }
     global.Night = 5; global.Route = 0;
     if (_k == "secret") { global.Night = 6; global.Route = 4; }
     var _dst = (_k == "secret") ? "CassidyEnding" : "MidnightCutscnes (night 5)";
@@ -361,14 +374,7 @@ function coop_s3_bot_step()
 {
     var _S = global.CoopS3, _c = global.Coop, _X = global.CoopMore;
     if (_S.ending != "" && !_S.endingDone && coop_is_host() && _c.connected && room == TitleScreenMap && oCoopNet.BotTimer > 180) { coop_s3_ending_go(_S.ending, true); }
-    // -coop-botbosswin T (host): T s into a boss night, beat the boss the way the game counts it
-    if (_S.bossWin >= 0 && !_S.bossWinDone && coop_is_host() && room == Office && coop_alive() && current_time - _X.officeAt >= _S.bossWin * 1000 && boss_fight_night())
-    {
-        _S.bossWinDone = true;
-        if (instance_exists(oSalvage)) { coop_log("bot: FORCED boss win: Salvage HP " + string_format(oSalvage.HP, 1, 2) + " -> 0 via lose_hp"); with (oSalvage) { lose_hp((HP + 1) / max(HPDrainRate, 0.0001), true); } }
-        else if (instance_exists(oHappiestDayDrawer)) { coop_log("bot: FORCED boss win: Happiest Day level 5 kid reached"); oHappiestDayDrawer.Level = 5; global.CoopS3.hdFred = true; coop_hd_win_apply(); if (_c.connected) { coop_send({ t: "hdwin" }); } }
-        else { coop_log("bot: FORCED boss win: win_night() (route " + string(global.Route) + ")"); win_night(); }
-    }
+    coop_s4_bosswin_step(); // 0.6.4: every boss route (Office and Fredbear rooms), see CoopS4
 }
 
 // ================= hooks =================
@@ -381,6 +387,7 @@ function coop_s3_step()
     coop_maze_look_step();
     coop_hd_step();
     coop_tod_step();
+    coop_s4_step();
     if (global.Coop.bot) { coop_boss_real_step(); coop_s3_bot_step(); }
 }
 

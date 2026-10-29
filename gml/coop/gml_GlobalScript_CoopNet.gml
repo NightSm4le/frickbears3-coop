@@ -3,8 +3,8 @@
 // Works through Porthole / any single-port TCP tunnel: client connects to 127.0.0.1:<port>.
 
 global.Coop = {
-    proto: 5,
-    modver: "0.6.3",
+    proto: 6,
+    modver: "0.6.4",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -45,6 +45,7 @@ global.Coop = {
     botPing: false,
     botWin: -1,
     botEndless: false,
+    botEndlessRound: 1,
     botCustom: -1,
     botPhony: false,
     botDoors: -1,
@@ -88,6 +89,7 @@ function coop_parse_args()
         else if (_p == "-coop-botping") { _c.botPing = true; }
         else if (_p == "-coop-botdoors" && i + 1 < _n) { i++; _c.botDoors = real(parameter_string(i)); }
         else if (_p == "-coop-botendless") { _c.botEndless = true; }
+        else if (_p == "-coop-botendlessround" && i + 1 < _n) { i++; _c.botEndless = true; _c.botEndlessRound = max(1, real(parameter_string(i))); }
         else if (_p == "-coop-botphony") { _c.botPhony = true; }
         else if (_p == "-coop-botcustom" && i + 1 < _n) { i++; _c.botCustom = real(parameter_string(i)); }
         else if (_p == "-coop-botwin" && i + 1 < _n) { i++; _c.botWin = real(parameter_string(i)); }
@@ -307,6 +309,7 @@ function coop_on_packet(_m)
             _c.partnerWon = false;
             var _oldNight = variable_global_exists("Night") ? global.Night : undefined;
             coop_apply_night(_m);
+            coop_s4_host_night(_m);
             global.CoopSync.followAt = current_time;
             if (_m.night == "Endless") { if (room != Office) { room_goto(Office); } }
             else if (room == Office && _oldNight == _m.night) { coop_log("SYNC: rejoined during night " + string(_m.night) + " -> staying in my office, clock follows the host"); }
@@ -354,7 +357,7 @@ function coop_on_packet(_m)
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m) && !coop_s3_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
+            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m) && !coop_s3_packet(_t, _m) && !coop_s4_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 

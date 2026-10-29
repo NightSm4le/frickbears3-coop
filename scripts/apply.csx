@@ -94,6 +94,9 @@ if (stage == "full")
     // 0.6.3: Fredbear microgames - host picks the microgame, shared lives
     g.QueueFindReplace("gml_Object_oFredbearManager_Draw_73", "Frame += global.MicrogameSpeed;", "Frame += coop_fb_frame_step(WaitTime);");
     g.QueueFindReplace("gml_Object_oFredbearManager_Draw_73", "        Lives--;\n        FailMode = true;", "        coop_fb_fail();");
+    // 0.6.4: night-number guard for the music list (S3-1) and Clark's letter page sync (S3-5)
+    g.QueueFindReplace("gml_Object_oCamera_Create_0", "SongID = MusicList[global.Night - 1];", "SongID = MusicList[coop_s4_music_idx(global.Night - 1, array_length(MusicList))];");
+    g.QueueFindReplace("gml_Object_oTalbertCutscene_Draw_0", "var Flip = input_check_pressed(UnknownEnum.Value_5) - input_check_pressed(UnknownEnum.Value_3);", "var Flip = coop_talbert_flip(input_check_pressed(UnknownEnum.Value_5) - input_check_pressed(UnknownEnum.Value_3));");
     // 0.6.3: maze dialog opened for the partner too
     g.QueueFindReplace("gml_Object_oCamera3DMaze_Cursor_Draw_0", "        LockZ = NearestPoint.Height;\n    }\n}", "        LockZ = NearestPoint.Height;\n    }\n    coop_maze_tb_open(NearestPoint.Text, NearestPoint.x, NearestPoint.y);\n}");
     // 0.6.3: team "Time Lasted" from the host

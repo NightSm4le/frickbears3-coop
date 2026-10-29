@@ -136,8 +136,9 @@ if (_c.bot)
             initialize_endless_data();
             global.Night = "Endless"; global.NightSpeedup = 3; global.Guard = 0; global.Lives = [0, 0, 0]; global.RunTime = 0;
             global.AllTimeSalvages = [16, 0, 1, 2]; global.AILevels = array_create(201, 0);
+            if (_c.botEndlessRound > 1) { global.EndlessRound = _c.botEndlessRound; }
             coop_prepare_night();
-            coop_log("bot: ENDLESS round 1 (picker skipped) -> Office");
+            coop_log("bot: ENDLESS round " + string(global.EndlessRound) + " (picker skipped" + (_c.botEndlessRound > 1 ? ", -coop-botendlessround" : "") + ") -> Office");
             room_goto(Office);
         }
         else

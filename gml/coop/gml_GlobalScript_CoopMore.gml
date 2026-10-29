@@ -538,6 +538,7 @@ function coop_partner_in_maze()
 function coop_maze_hold()
 {
     var _M = global.CoopM;
+    if (coop_s4_salvage_results_guard()) { return true; }
     if (!global.CoopCfg.maze || !coop_partner_in_maze()) { return false; }
     _M.waitShown = true; _M.waitAt = current_time;
     coop_log("MAZE: out of the maze first -> waiting for partner (night not advanced yet)");
@@ -552,7 +553,8 @@ function coop_maze_wait_step()
     {
         _M.waitShown = false;
         coop_log("MAZE: partner left the maze -> continue (as oSalvageSheet does)");
-        global.Night++; global.StartRoom = NightOpening; create_save(); room_goto(NightOpening); window_set_cursor(cr_default);
+        if (coop_s4_host_night_recent()) { coop_log("NIGHT GUARD: host already set night " + string(global.Night) + " -> not advancing again"); } else { global.Night++; }
+        global.StartRoom = NightOpening; create_save(); room_goto(NightOpening); window_set_cursor(cr_default);
     }
 }
 
@@ -811,8 +813,11 @@ function coop_more_draw()
     if (room == Office && _c.connected && instance_exists(oScraptrap))
     {
         var _ty = (instance_exists(oSalvage) && global.CoopCfg.bossShared) ? 64 : 48; // 0.6.3: below the cam strip (3..28) and the alert banner (31..46)
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw / 2 - 80, _ty, _gw / 2 + 80, _ty + 14, false); draw_set_alpha(1);
-        draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_gw / 2, _ty + 1, "SHARED TASKS LEFT: " + string(array_length(oScraptrap.Tasks)) + " (partner did " + string(_B.scrapIn) + ")"); draw_set_halign(fa_left);
+        // 0.6.4 (S3-4): with the cams up, centre it over the camera view (right of the cam map and clear of its corner marks)
+        var _tx = (variable_global_exists("CamUp") && global.CamUp) ? round(_gw * 0.6875) : _gw / 2;
+        var _tt = "SHARED TASKS LEFT: " + string(array_length(oScraptrap.Tasks)) + " (partner did " + string(_B.scrapIn) + ")", _tw = string_width(_tt) / 2 + 4;
+        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_tx - _tw, _ty, _tx + _tw, _ty + 14, false); draw_set_alpha(1);
+        draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_tx, _ty + 1, _tt); draw_set_halign(fa_left);
     }
     if (coop_is_maze_room(room) && _c.connected)
     {
