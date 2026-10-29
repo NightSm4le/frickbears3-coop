@@ -8,6 +8,7 @@ global.CoopCfg = {
     repel: 50, revives: 1, jd: 1, bossShared: 1, maze: 1, specReward: 100,
     // local
     mask: 0,              // 0 freddy, 1 bonnie, 2 chica (my own mask, sent to the partner)
+    devMode: false,
     partnerMask: 1,
     partnerMaskRaw: -1,   // 0.6.2: mask the partner chose (partnerMask = what we draw; P2 never looks like P1)
     loaded: false, fromHost: false
@@ -66,6 +67,7 @@ function coop_cfg_load()
     _g.maze = ini_read_real("coop", "maze", 1);
     _g.specReward = ini_read_real("coop", "specreward", 100);
     _g.mask = clamp(ini_read_real("coop", "mask", 0), 0, 2);
+    _g.devMode = ini_read_real("coop", "devmode", 0) != 0;
     ini_close();
     _g.loaded = true;
     coop_cfg_apply("load");
@@ -81,6 +83,7 @@ function coop_cfg_save()
         ini_write_real("coop", "bossshared", _g.bossShared); ini_write_real("coop", "maze", _g.maze); ini_write_real("coop", "specreward", _g.specReward);
     }
     ini_write_real("coop", "mask", _g.mask);
+    ini_write_real("coop", "devmode", _g.devMode ? 1 : 0);
     ini_close();
 }
 
@@ -97,7 +100,7 @@ function coop_cfg_apply(_why)
     global.CoopA.repelChance = _g.repel;
     coop_mask_fix();
     coop_log("CFG (" + _why + "): repel=" + string(_g.repel) + " revives=" + string(_g.revives) + " jd=" + string(_g.jd) + " bossShared=" + string(_g.bossShared)
-        + " maze=" + string(_g.maze) + " specReward=" + string(_g.specReward) + " mask=" + coop_mask_name(_g.mask) + ((_g.partnerMaskRaw >= 0 && coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw) != _g.mask) ? " (shown as " + coop_mask_name(coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw)) + ", same as P1)" : "") + " partnerMask=" + coop_mask_name(_g.partnerMask) + ((_g.partnerMaskRaw >= 0 && _g.partnerMaskRaw != _g.partnerMask) ? " (picked " + coop_mask_name(_g.partnerMaskRaw) + ", same as P1)" : "") + " fromHost=" + string(_g.fromHost));
+        + " maze=" + string(_g.maze) + " specReward=" + string(_g.specReward) + " mask=" + coop_mask_name(_g.mask) + ((_g.partnerMaskRaw >= 0 && coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw) != _g.mask) ? " (shown as " + coop_mask_name(coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw)) + ", same as P1)" : "") + " partnerMask=" + coop_mask_name(_g.partnerMask) + ((_g.partnerMaskRaw >= 0 && _g.partnerMaskRaw != _g.partnerMask) ? " (picked " + coop_mask_name(_g.partnerMaskRaw) + ", same as P1)" : "") + " devMode=" + string(_g.devMode) + " fromHost=" + string(_g.fromHost));
 }
 
 function coop_cfg_send() { if (global.Coop.connected) { coop_send(coop_cfg_msg()); } }
@@ -113,13 +116,15 @@ function coop_set_options()
         "3D maze together: " + (_g.maze ? "ON" : "OFF") + _h,
         "Spectator reward: " + string(_g.specReward) + "%" + _h,
         "My mask: " + string_upper(coop_mask_name(_g.mask)) + ((_g.partnerMaskRaw >= 0 && coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw) != _g.mask) ? " (same as P1 -> shown " + string_upper(coop_mask_name(coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw))) + ")" : ""),
+        "Developer mode: " + (_g.devMode ? "ON" : "OFF"),
         "Back"
     ];
 }
 
 function coop_set_desc()
 {
-    var _s = "Co-op settings. Host decides for both;\nyour mask is your own (draft sprite).";
+    var _s = "Co-op settings. Host decides for both;\nyour mask and developer mode are local.";
+    if (_g.devMode) { _s += "\nDeveloper mode shows spectator stream diagnostics."; }
     if (coop_is_client()) { _s += "\nConnected: values come from the host."; }
     if (variable_global_exists("Difficulty")) { _s += "\nDifficulty (shared, host save): " + string(global.Difficulty); }
     return _s;
@@ -139,6 +144,7 @@ function coop_set_select()
         case 4: _g.maze = !_g.maze; break;
         case 5: _g.specReward = (_g.specReward == 100) ? 50 : ((_g.specReward == 50) ? 0 : 100); break;
         case 6: _g.mask = (_g.mask + 1) mod 3; break;
+        case 7: _g.devMode = !_g.devMode; break;
         default: goto_menu("Co-op", 4); return;
     }
     coop_cfg_save(); coop_cfg_apply("menu"); coop_cfg_send();
@@ -155,7 +161,15 @@ function coop_art_get(_slot, _mask, _kind)
     if (variable_struct_exists(_A.spr, _key)) { return variable_struct_get(_A.spr, _key); }
     var _f = working_directory + "coop_art/" + _key + ".png";
     var _s = -1;
-    if (file_exists(_f)) { _s = sprite_add(_f, (_kind == "bill") ? 6 : 1, false, false, 0, 0); }
+    if (file_exists(_f))
+    {
+        _s = sprite_add(_f, (_kind == "bill") ? 6 : 1, false, false, 0, 0);
+        if (_s >= 0 && _kind == "bill" && (sprite_get_number(_s) != 6 || sprite_get_width(_s) != 32 || sprite_get_height(_s) != 64))
+        {
+            coop_log("art: invalid " + _f + " (expected six 32x64 frames); using embedded art");
+            sprite_delete(_s); _s = -1;
+        }
+    }
     // 0.6.3: no coop_art folder -> the same draft art embedded in data.win (written once to the save folder)
     if (_s < 0)
     {

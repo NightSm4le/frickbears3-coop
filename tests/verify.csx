@@ -41,5 +41,12 @@ if (stage == "full")
     var net = D("gml_GlobalScript_CoopNet");
     need(net.Split("coop_save_enter()").Length - 1 >= 2, "coop_save_enter not called from host+join");
     need(net.Contains("coop_feat_packet("), "feature packets not dispatched");
+    var more = D("gml_GlobalScript_CoopMore");
+    need(more.Contains("devmode") && more.Contains("Developer mode: "), "saved developer mode setting missing");
+    need(more.Contains("expected six 32x64 frames"), "custom co-op art validation missing");
+    var spec = D("gml_GlobalScript_CoopSpec");
+    need(spec.Contains("DEV STREAM") && spec.Contains("Frames received"), "spectator developer diagnostics missing");
+    need(spec.Contains("budget: 65536"), "high-bandwidth spectator budget missing");
+    need(spec.Contains("1920, 1080") && spec.Contains("1280, 720"), "1080p adaptive spectator levels missing");
 }
 Console.WriteLine(bad.Count == 0 ? "VERIFY OK " + stage : "VERIFY FAIL: " + string.Join("; ", bad));
