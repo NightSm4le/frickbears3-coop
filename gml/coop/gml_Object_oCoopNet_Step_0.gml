@@ -1,9 +1,14 @@
 var _c = global.Coop;
+// 0.6.1: our own freeze (heavy room load, busy PC) must not count as partner silence
+if (!variable_struct_exists(_c, "stepAt")) { _c.stepAt = current_time; }
+if (current_time - _c.stepAt > 1500) { _c.lastRecv = min(current_time, _c.lastRecv + (current_time - _c.stepAt)); coop_log("NET: this game froze for " + string(current_time - _c.stepAt) + " ms (not counted as partner silence)"); }
+_c.stepAt = current_time;
 // --- heartbeat / timeout ---
 if (_c.connected)
 {
     if (current_time - _c.lastPing > 1000) { _c.lastPing = current_time; coop_send({ t: "ping", ts: current_time }); }
-    if (current_time - _c.lastRecv > 10000)
+    var _lim = (room == NightOpening || coop_partner_get("rm", "") == "NightOpening") ? 30000 : 10000; // 0.6.1: the Office load after the night card can take long on a slow PC
+    if (current_time - _c.lastRecv > _lim)
     {
         coop_log("timeout");
         if (coop_is_host()) { coop_drop_partner("timeout"); } else { coop_disconnect("timeout"); }
@@ -43,6 +48,7 @@ coop_spec_step();
 coop_help_step();
 coop_feat_step();
 coop_more_step();
+coop_sync_step();
 coop_ui_keys();
 coop_title_step();
 // --- ping (P) ---

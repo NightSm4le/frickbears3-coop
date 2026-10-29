@@ -82,6 +82,11 @@ if (stage == "full")
         "case \"__coopset\":\n            coop_set_select();\n            break;\n        case \"__coop\":\n            coop_title_select();\n            break;\n        case \"Co-op\":\n            goto_menu(\"Co-op\", 0);\n            break;\n        case \"Back\":");
     g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "if (input_check_pressed(UnknownEnum.Value_1) && !Transitioning && CurMenu != \"Remap In Progress\")",
         "if (CurMenu == \"Co-op Settings\" && input_check_pressed(UnknownEnum.Value_1) && !Transitioning)\n{\n    audio_play_sound(sfxBump, 5, false);\n    coop_set_back();\n    input_clear(UnknownEnum.Value_1);\n}\nelse if (CurMenu == \"Co-op\" && input_check_pressed(UnknownEnum.Value_1) && !Transitioning)\n{\n    audio_play_sound(sfxBump, 5, false);\n    coop_title_back();\n    input_clear(UnknownEnum.Value_1);\n}\nif (input_check_pressed(UnknownEnum.Value_1) && !Transitioning && CurMenu != \"Remap In Progress\")");
+    // 0.6.1 synced start: whoever starts, the partner starts the same thing (see CoopSync)
+    g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "function new_game(arg0)\n{\n    save_permanent_data();", "function new_game(arg0)\n{\n    coop_sync_menu(\"new\", arg0);\n    save_permanent_data();");
+    g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "RoomDestination = global.StartRoom;", "RoomDestination = global.StartRoom;\n            coop_sync_menu(\"cont\", 0);");
+    g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "case \"Quit to Menu\":\n            Transitioning = true;", "case \"Quit to Menu\":\n            Transitioning = true;\n            coop_sync_menu(\"quit\", 0);");
+    g.QueueFindReplace("gml_Object_oTitleMenu_Step_0", "if (TransitionFrame >= 60)\n{", "if (Transitioning && TransitionFrame == 1)\n{\n    coop_sync_menu(\"room\", RoomDestination);\n}\nif (TransitionFrame >= 60)\n{");
 }
 
 var res = g.Import();

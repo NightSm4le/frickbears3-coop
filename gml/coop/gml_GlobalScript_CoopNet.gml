@@ -3,8 +3,8 @@
 // Works through Porthole / any single-port TCP tunnel: client connects to 127.0.0.1:<port>.
 
 global.Coop = {
-    proto: 2,
-    modver: "0.6.0",
+    proto: 3,
+    modver: "0.6.1",
     mode: "off",          // off | host | client
     server: -1,
     sock: -1,             // client: own socket, host: partner socket
@@ -212,6 +212,45 @@ function coop_night_payload()
     return _m;
 }
 
+// 0.6.1: shared by the client ("night" from host) and the host ("nreq": the client started a Custom/boss/Endless night)
+function coop_apply_night(_m)
+{
+    var _c = global.Coop;
+    global.Night = variable_struct_get(_m, "night");
+    coop_prepare_night();
+    if (variable_struct_exists(_m, "difficulty")) { global.Difficulty = _m.difficulty; }
+    if (variable_struct_exists(_m, "ai")) { global.AILevels = _m.ai; }
+    if (variable_struct_exists(_m, "speedup")) { global.NightSpeedup = _m.speedup; }
+    if (variable_struct_exists(_m, "shuffle")) { global.ShuffleMode = _m.shuffle; }
+    if (variable_struct_exists(_m, "route"))
+    {
+        global.Route = _m.route; if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; } if (variable_struct_exists(_m, "bossphase")) { global.BossPhase = _m.bossphase; }
+        if (_m.night == "Custom") { global.Upgrades = []; global.SavedBossTime = 0; global.SummonedAnimatronics = []; global.Challenge = undefined; global.ChallengeTitle = "None"; global.CustomNightMusic = undefined; if (!variable_global_exists("Cheats")) { global.Cheats = array_create(10, false); } }
+        coop_log("BOSS: route " + string(_m.route) + " phase " + (variable_global_exists("BossPhase") ? string(global.BossPhase) : "-") + " from host (boss_fight=" + string(boss_fight_night()) + ")");
+    }
+    if (is_numeric(_m.night))
+    {
+        if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; }
+        if (variable_struct_exists(_m, "scraps")) { global.SalvagedScraps = _m.scraps; }
+        coop_log("ROSTER: " + string(variable_struct_exists(_m, "salv") ? array_length(_m.salv) : -1) + " salvaged animatronics from host");
+    }
+    if (variable_struct_exists(_m, "cheats")) { global.Cheats = _m.cheats; }
+    if (_m.night == "Endless")
+    {
+        var _dif = global.Difficulty;
+        var _fresh = !variable_global_exists("EndlessInventory") || !variable_global_exists("EndlessRound") || (variable_struct_exists(_m, "round") && _m.round <= 1);
+        if (_fresh) { initialize_endless_data(); }
+        global.Night = "Endless"; global.Difficulty = _dif;
+        if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; }
+        if (variable_struct_exists(_m, "round")) { global.EndlessRound = _m.round; }
+        if (variable_struct_exists(_m, "guard")) { global.Guard = _m.guard; if (_fresh) { global.Lives = array_create(3, global.Guard); } }
+        global.AILevels = array_create(201, 0);
+        coop_log("ENDLESS: round " + string(global.EndlessRound) + " guard " + string(global.Guard) + " salvages " + string(array_length(global.AllTimeSalvages)) + " from host");
+    }
+    coop_log("ECON: difficulty " + string(global.Difficulty) + " from host (one difficulty for both)");
+    coop_log("host started night " + string(global.Night));
+}
+
 // --- incoming ---
 function coop_on_packet(_m)
 {
@@ -247,44 +286,15 @@ function coop_on_packet(_m)
         case "pong":
             _c.rtt = current_time - variable_struct_get(_m, "ts");
             break;
-        case "night": // client: follow host into the same night
+        case "night": // client: follow host into the same night (host is the authority for the night number)
             if (!coop_is_client()) { break; }
             _c.hostNight = variable_struct_get(_m, "night");
             _c.partnerWon = false;
-            global.Night = variable_struct_get(_m, "night");
-            coop_prepare_night();
-            if (variable_struct_exists(_m, "difficulty")) { global.Difficulty = _m.difficulty; }
-            if (variable_struct_exists(_m, "ai")) { global.AILevels = _m.ai; }
-            if (variable_struct_exists(_m, "speedup")) { global.NightSpeedup = _m.speedup; }
-            if (variable_struct_exists(_m, "shuffle")) { global.ShuffleMode = _m.shuffle; }
-            if (variable_struct_exists(_m, "route"))
-            {
-                global.Route = _m.route; if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; } if (variable_struct_exists(_m, "bossphase")) { global.BossPhase = _m.bossphase; }
-                if (_m.night == "Custom") { global.Upgrades = []; global.SavedBossTime = 0; global.SummonedAnimatronics = []; global.Challenge = undefined; global.ChallengeTitle = "None"; global.CustomNightMusic = undefined; if (!variable_global_exists("Cheats")) { global.Cheats = array_create(10, false); } }
-                coop_log("BOSS: route " + string(_m.route) + " phase " + (variable_global_exists("BossPhase") ? string(global.BossPhase) : "-") + " from host (boss_fight=" + string(boss_fight_night()) + ")");
-            }
-            if (is_numeric(_m.night))
-            {
-                if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; }
-                if (variable_struct_exists(_m, "scraps")) { global.SalvagedScraps = _m.scraps; }
-                coop_log("ROSTER: " + string(variable_struct_exists(_m, "salv") ? array_length(_m.salv) : -1) + " salvaged animatronics from host");
-            }
-            if (variable_struct_exists(_m, "cheats")) { global.Cheats = _m.cheats; }
-            if (_m.night == "Endless")
-            {
-                var _dif = global.Difficulty;
-                var _fresh = !variable_global_exists("EndlessInventory") || !variable_global_exists("EndlessRound") || (variable_struct_exists(_m, "round") && _m.round <= 1);
-                if (_fresh) { initialize_endless_data(); }
-                global.Night = "Endless"; global.Difficulty = _dif;
-                if (variable_struct_exists(_m, "salv")) { global.AllTimeSalvages = _m.salv; }
-                if (variable_struct_exists(_m, "round")) { global.EndlessRound = _m.round; }
-                if (variable_struct_exists(_m, "guard")) { global.Guard = _m.guard; if (_fresh) { global.Lives = array_create(3, global.Guard); } }
-                global.AILevels = array_create(201, 0);
-                coop_log("ENDLESS: round " + string(global.EndlessRound) + " guard " + string(global.Guard) + " salvages " + string(array_length(global.AllTimeSalvages)) + " from host");
-            }
-            coop_log("ECON: difficulty " + string(global.Difficulty) + " from host (one difficulty for both)");
-            coop_log("host started night " + string(global.Night));
+            var _oldNight = variable_global_exists("Night") ? global.Night : undefined;
+            coop_apply_night(_m);
+            global.CoopSync.followAt = current_time;
             if (_m.night == "Endless") { if (room != Office) { room_goto(Office); } }
+            else if (room == NightOpening && _oldNight != _m.night) { coop_log("SYNC: my save had night " + string(_oldNight) + ", host has " + string(_m.night) + " -> restart opening"); room_restart(); }
             else if (room != NightOpening && room != Office) { room_goto(NightOpening); }
             break;
         case "clock": // client: host is the clock authority
@@ -328,7 +338,7 @@ function coop_on_packet(_m)
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
+            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 
@@ -432,6 +442,7 @@ function coop_draw_gui()
     coop_warn_draw();
     coop_feat_draw();
     coop_more_draw();
+    coop_sync_draw();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
     if (room == Office && _c.connected) { coop_draw_overlay(); }
     if (!_c.menuOpen) { return; }
