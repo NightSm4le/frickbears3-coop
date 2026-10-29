@@ -262,6 +262,16 @@ function coop_help_key_free(_k)
     return !array_contains(global.ControlsOptions, _k);
 }
 
+// 0.6.3: how much power the partner can still take; -1 = no fresh data (snapshot older than 1.5 s)
+function coop_give_room()
+{
+    var _c = global.Coop;
+    if (current_time - _c.partnerSnapAt > 1500) { return -1; }
+    var _ppw = coop_partner_get("pw", -1), _pmax = coop_partner_get("pmax", 100);
+    if (!is_real(_ppw) || _ppw < 0 || !is_real(_pmax)) { return -1; }
+    return _pmax - _ppw;
+}
+
 function coop_help_power_max() { return (instance_exists(oCamera) && variable_instance_exists(oCamera, "MaxPower")) ? oCamera.MaxPower : 100; }
 
 // _what: "give" | "warn" | "lure"; returns true if sent
@@ -276,10 +286,14 @@ function coop_help_do(_what, _src)
         case "give":
             if (_now < _s.cdGive) { coop_alert("Give power: cooldown " + string(ceil((_s.cdGive - _now) / 1000)) + "s", c_gray, undefined); return false; }
             if (global.Power < 15) { coop_alert("Give power: need 15%+", c_gray, undefined); return false; }
-            var _ppw = coop_partner_get("pw", -1); var _pmax = coop_partner_get("pmax", 100); if (is_real(_ppw) && is_real(_pmax) && _ppw >= _pmax - 0.5) { coop_alert("Give power: partner's power is full", c_gray, undefined); coop_log("help: give skipped, partner power " + string(_ppw)); return false; } // 0.6.2
-            global.Power -= 10; _s.cdGive = _now + 20000; _s.st.give++; global.CoopF.sc.give += 10;
-            coop_send({ t: "give", amt: 10 });
-            coop_alert("Sent 10% power to partner", c_lime, sfxBitCollect);
+            // 0.6.3: ONE check for every path (G key, F8 button, bot): fresh partner power, give only what fits (max 10%)
+            var _room = coop_give_room();
+            if (_room < 0) { coop_alert("Give power: partner's power unknown (no fresh data)", c_gray, undefined); coop_log("help: give skipped (" + _src + "), partner power data stale"); return false; }
+            if (_room < 2) { coop_alert("Give power: partner's power is full", c_gray, undefined); coop_log("help: give skipped (" + _src + "), partner power " + string(coop_partner_get("pw", -1)) + "/" + string(coop_partner_get("pmax", 100))); return false; }
+            var _amt = min(10, floor(_room));
+            global.Power -= _amt; _s.cdGive = _now + 20000; _s.st.give++; global.CoopF.sc.give += _amt;
+            coop_send({ t: "give", amt: _amt });
+            coop_alert("Sent " + string(_amt) + "% power to partner", c_lime, sfxBitCollect);
             break;
         case "warn":
             if (_now < _s.cdWarn) { coop_alert("Warn: cooldown " + string(ceil((_s.cdWarn - _now) / 1000)) + "s", c_gray, undefined); return false; }
@@ -315,6 +329,7 @@ function coop_help_packet(_t, _m)
             if (round(_got) >= 1) { coop_alert("Partner sent you +" + string(round(_got)) + "% power", c_lime, sfxBitCollect); } // 0.6.2: no "+0%" alert
             coop_log("help: got power " + string(_old) + " -> " + string(global.Power));
             if (_got < _m.amt) { coop_send({ t: "helpack", what: "give", ok: 0, amt: _m.amt - _got }); }
+            coop_send(coop_snapshot()); global.Coop.lastSnapSend = current_time; // 0.6.3: the giver sees my new power at once
             return true;
         case "warn":
             _s.st.warnIn++;

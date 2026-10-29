@@ -98,17 +98,17 @@ function coop_draw_overlay()
         if (_st[0] != "") { draw_set_color(_st[1]); draw_text(_px + 3, _py + 1, _txt + _st[0]); }
         else if (_strip)
         {
-            draw_set_color(c_white); draw_text(_px + 3, _py + 1, _txt + string(floor(max(_pw, 0))) + "%");
-            draw_set_color(c_dkgray); draw_rectangle(_px + 56, _py + 5, _px + 140, _py + 10, false);
-            draw_set_color(_pw > 25 ? c_lime : c_red); draw_rectangle(_px + 56, _py + 5, _px + 56 + 84 * clamp(_pw, 0, 100) / 100, _py + 10, false);
-            draw_set_color(coop_partner_get("d0", 0) ? c_red : c_dkgray); draw_rectangle(_px + 4, _py + 16, _px + 11, _py + 23, false);
-            draw_set_color(coop_partner_get("d1", 0) ? c_red : c_dkgray); draw_rectangle(_px + 14, _py + 16, _px + 21, _py + 23, false);
+            // 0.6.3: all text on row 1 (nothing clipped at the strip's bottom edge), row 2 = doors + power bar only
             var _sv = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "OFFICE";
             if (coop_partner_get("mk", 0)) { _sv = "MASK"; }
             if (coop_partner_get("pu", 0)) { _sv = "PANEL"; }
-            if (coop_partner_get("fan", 0)) { _sv += " FAN"; }
-            draw_set_color(c_white); draw_text(_px + 26, _py + 13, _sv);
-            draw_set_color(c_gray); draw_text(_px + 104, _py + 13, (_c.rtt >= 0) ? string(_c.rtt) + "ms" : "");
+            if (coop_partner_get("fan", 0)) { _sv += "+FAN"; }
+            draw_set_color(c_white); draw_text(_px + 3, _py + 1, _txt + string(floor(max(_pw, 0))) + "% " + _sv);
+            draw_set_color(coop_partner_get("d0", 0) ? c_red : c_dkgray); draw_rectangle(_px + 4, _py + 16, _px + 10, _py + 21, false);
+            draw_set_color(coop_partner_get("d1", 0) ? c_red : c_dkgray); draw_rectangle(_px + 13, _py + 16, _px + 19, _py + 21, false);
+            draw_set_color(c_dkgray); draw_rectangle(_px + 24, _py + 17, _px + 110, _py + 20, false);
+            draw_set_color(_pw > 25 ? c_lime : c_red); draw_rectangle(_px + 24, _py + 17, _px + 24 + 86 * clamp(_pw, 0, 100) / 100, _py + 20, false);
+            draw_set_color(c_gray); draw_text(_px + 114, _py + 12, (_c.rtt >= 0) ? string(_c.rtt) : "");
         }
         else if (_mode == 1)
         {

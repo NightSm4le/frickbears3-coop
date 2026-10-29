@@ -3,8 +3,8 @@
 // Works through Porthole / any single-port TCP tunnel: client connects to 127.0.0.1:<port>.
 
 global.Coop = {
-    proto: 4,
-    modver: "0.6.2",
+    proto: 5,
+    modver: "0.6.3",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -354,7 +354,7 @@ function coop_on_packet(_m)
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
+            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m) && !coop_s3_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 
@@ -386,6 +386,7 @@ function coop_alive()
 function coop_snapshot()
 {
     var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive(), sp: global.CoopS.spec ? 1 : 0, sc: coop_score_arr() };
+    if (variable_global_exists("TimeOfDeath") && is_numeric(global.TimeOfDeath)) { _s.tod = global.TimeOfDeath; }
     if (room == Office)
     {
         if (variable_global_exists("Power")) { _s.pw = round(global.Power * 10) / 10; }
@@ -454,7 +455,7 @@ function coop_draw_gui()
         draw_set_color(c_yellow); draw_text(_bx + 6, 48, _bt); draw_set_color(c_white);
     }
     // small status line (always, when coop active)
-    else if (_c.mode != "off" && !_c.menuOpen && !(room == Office && _c.connected) && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op"))
+    else if (_c.mode != "off" && !_c.menuOpen && !(room == Office && _c.connected) && !(coop_is_maze_room(room) && _c.connected) && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op"))
     {
         draw_set_alpha(0.7);
         draw_set_color(c_white);
@@ -468,6 +469,7 @@ function coop_draw_gui()
     coop_feat_draw();
     coop_more_draw();
     coop_sync_draw();
+    coop_s3_draw();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
     if (room == Office && _c.connected) { coop_draw_overlay(); }
     if (!_c.menuOpen) { return; }

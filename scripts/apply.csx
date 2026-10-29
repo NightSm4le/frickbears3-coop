@@ -91,6 +91,13 @@ if (stage == "full")
     g.QueueFindReplace("gml_Object_oHappyFrog_Draw_77", "show_debug_message($\"RAGE: {KillTimer}\");", "// 0.6.2: RAGE debug print removed");
     g.QueueFindReplace("gml_Object_oPhoneGuy_Draw_77", "draw_text_ext(320 + round(lengthdir_x(1, FontDirection)), 300 + round(lengthdir_y(1, FontDirection)), Text, 15, 400);", "draw_text_ext(coop_sub_x() + round(lengthdir_x(1, FontDirection)), 300 + round(lengthdir_y(1, FontDirection)), Text, 15, coop_sub_w());");
     g.QueueFindReplace("gml_Object_oPhoneGuy_Draw_77", "draw_text_ext(320, 300, Text, 15, 400);", "draw_text_ext(coop_sub_x(), 300, Text, 15, coop_sub_w());");
+    // 0.6.3: Fredbear microgames - host picks the microgame, shared lives
+    g.QueueFindReplace("gml_Object_oFredbearManager_Draw_73", "Frame += global.MicrogameSpeed;", "Frame += coop_fb_frame_step(WaitTime);");
+    g.QueueFindReplace("gml_Object_oFredbearManager_Draw_73", "        Lives--;\n        FailMode = true;", "        coop_fb_fail();");
+    // 0.6.3: maze dialog opened for the partner too
+    g.QueueFindReplace("gml_Object_oCamera3DMaze_Cursor_Draw_0", "        LockZ = NearestPoint.Height;\n    }\n}", "        LockZ = NearestPoint.Height;\n    }\n    coop_maze_tb_open(NearestPoint.Text, NearestPoint.x, NearestPoint.y);\n}");
+    // 0.6.3: team "Time Lasted" from the host
+    g.QueueFindReplace("gml_Object_oGameOver_Draw_0", "format_as_timer(min(global.TimeOfDeath, 359.99), true);", "format_as_timer(min(coop_tod(), 359.99), true);");
 }
 
 var res = g.Import();

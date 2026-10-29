@@ -293,7 +293,8 @@ function coop_tb_list()
     return _l;
 }
 
-function coop_tb_sync_room() { return room != Office && !coop_is_maze_room(room); }
+// 0.6.3: maze dialogs are shared too (opened for both by coop_maze_tb_open, pages turned by either player)
+function coop_tb_sync_room() { return room != Office && (!coop_is_maze_room(room) || (variable_global_exists("CoopCfg") && global.CoopCfg.maze)); }
 
 // a local press on a dialog: tell the partner which page and what it did (reveal / advance)
 function coop_tb_send_press(_i)
@@ -386,7 +387,9 @@ function coop_sync_step()
     {
         var _pr = coop_partner_get("rm", "");
         var _fresh = current_time - _c.partnerSnapAt < 2500;
-        _S.gating = _fresh && _pr != "NightOpening" && _pr != "Office" && current_time - _S.gateStart < 30000;
+        // 0.6.3: a partner who is already AHEAD (Fredbear microgames, maze, game over, night clear) is not waited for
+        var _ahead = string_pos("Fredbear", _pr) == 1 || _pr == "GameOver" || _pr == "NightClear" || string_pos("MinigameMaze_", _pr) == 1;
+        _S.gating = _fresh && !_ahead && _pr != "NightOpening" && _pr != "Office" && current_time - _S.gateStart < 30000;
         if (_S.gating)
         {
             with (oNightOpening) { if (Frame > 230) { Frame = 230; } }

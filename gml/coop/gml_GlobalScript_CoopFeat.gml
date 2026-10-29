@@ -234,8 +234,8 @@ function coop_warn_draw()
             coop_warn_text(_w / 2, 37, string_upper(_s.warnName), make_color_rgb(244, 240, 232), _a * 0.9, fa_center);
             break;
         case "M":
-            coop_icon_draw("note", _w / 2 - 6, _h - 78, 1, _a, false, undefined);
-            coop_warn_text(_w / 2, _h - 66, string_upper(_s.warnName), make_color_rgb(244, 240, 232), _a * 0.9, fa_center);
+            coop_icon_draw("note", _w / 2 - 6, coop_hint_base(), 1, _a, false, undefined);
+            coop_warn_text(_w / 2, coop_hint_base() + 12, string_upper(_s.warnName), make_color_rgb(244, 240, 232), _a * 0.9, fa_center);
             break;
         default:
             coop_icon_draw("warn", _w / 2 - 7, 24, 1, _a, false, undefined);
@@ -350,6 +350,17 @@ function coop_revive_step()
     }
 }
 
+// 0.6.3 (S2-7): the Phone Guy subtitle is drawn bottom-aligned at y 300 and grows UP over y 284 (our hint line).
+// While it is on screen, our hints go to the free band under it (y 304..330, above the bottom bars).
+function coop_phone_sub_active()
+{
+    if (!variable_global_exists("Settings")) { return false; }
+    var _on = false;
+    with (oPhoneGuy) { if (PhoneActive == 2 && Timer > 10 && TonightsCall != undefined && subtitles_enabled()) { _on = true; } }
+    return _on;
+}
+function coop_hint_base() { return coop_phone_sub_active() ? 306 : display_get_gui_height() - 78; }
+
 function coop_revive_draw()
 {
     var _f = global.CoopF, _c = global.Coop;
@@ -358,11 +369,11 @@ function coop_revive_draw()
     if (_f.revLeft <= 0) { return; }
     if (_f.revHold <= 0)
     {
-        coop_small_text(_w / 2, _h - 76, "PARTNER IS DOWN - HOLD V 3s TO REVIVE (doors open!)", make_color_rgb(244, 240, 232), 0.6 + 0.3 * sin(current_time / 200), fa_center);
+        coop_small_text(_w / 2, coop_hint_base() + 2, "PARTNER IS DOWN - HOLD V 3s TO REVIVE (doors open!)", make_color_rgb(244, 240, 232), 0.6 + 0.3 * sin(current_time / 200), fa_center);
         return;
     }
     var _p = clamp(_f.revHold / 3000, 0, 1);
-    var _x1 = _w / 2 - 50, _y1 = _h - 78;
+    var _x1 = _w / 2 - 50, _y1 = coop_hint_base();
     draw_set_color(c_black); draw_rectangle(_x1 - 1, _y1 - 1, _x1 + 101, _y1 + 7, false);
     draw_set_color(make_color_rgb(244, 240, 232)); draw_rectangle(_x1 - 1, _y1 - 1, _x1 + 101, _y1 + 7, true);
     draw_set_color(make_color_rgb(88, 200, 72)); draw_rectangle(_x1 + 1, _y1 + 1, _x1 + 1 + 98 * _p, _y1 + 5, false);

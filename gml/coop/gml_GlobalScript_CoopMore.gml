@@ -156,6 +156,18 @@ function coop_art_get(_slot, _mask, _kind)
     var _f = working_directory + "coop_art/" + _key + ".png";
     var _s = -1;
     if (file_exists(_f)) { _s = sprite_add(_f, (_kind == "bill") ? 6 : 1, false, false, 0, 0); }
+    // 0.6.3: no coop_art folder -> the same draft art embedded in data.win (written once to the save folder)
+    if (_s < 0)
+    {
+        var _b64 = coop_art_embedded(_key);
+        if (_b64 != "")
+        {
+            var _tmp = game_save_id + "coop_art_" + _key + ".png";
+            if (!file_exists(_tmp)) { var _buf = buffer_base64_decode(_b64); buffer_save(_buf, _tmp); buffer_delete(_buf); }
+            if (file_exists(_tmp)) { _s = sprite_add(_tmp, (_kind == "bill") ? 6 : 1, false, false, 0, 0); }
+            if (_s >= 0) { coop_log("art: " + _key + " from the art embedded in data.win (" + string(sprite_get_width(_s)) + "x" + string(sprite_get_height(_s)) + " x" + string(sprite_get_number(_s)) + ")"); variable_struct_set(_A.spr, _key, _s); return _s; }
+        }
+    }
     if (_s < 0) { _s = coop_art_placeholder(_slot, _kind); coop_log("art: " + _f + " missing -> generated placeholder"); }
     else { coop_log("art: loaded draft " + _f + " (" + string(sprite_get_width(_s)) + "x" + string(sprite_get_height(_s)) + " x" + string(sprite_get_number(_s)) + ")"); }
     variable_struct_set(_A.spr, _key, _s);
@@ -265,12 +277,13 @@ function coop_more_packet(_t, _m)
             if (instance_exists(oCamera3DMaze) && !_M.meCaught) { coop_maze_die_local("host enemy " + string(_m.e)); }
             return true;
         case "money":
-            _E.pMoney = _m.m;
+            _E.pMoney = max(0, _m.m); // 0.6.3: never show a negative partner balance
             return true;
         case "buy":
             _E.buysIn++;
             array_push(_E.pBuys, _m.name);
-            _E.pMoney = _m.money;
+            if (_m.money < 0) { coop_log("ECON: partner balance " + string(_m.money) + " < 0 in a buy packet -> shown as 0"); }
+            _E.pMoney = max(0, _m.money);
             coop_log("ECON: partner bought " + _m.name + " (id " + string(_m.id) + "), partner money " + string(_m.money) + "; my money " + string(global.RunEarnings) + " untouched");
             coop_alert("Partner bought: " + _m.name, c_aqua, undefined);
             global.CoopA.alertAt = current_time;
@@ -596,6 +609,9 @@ function coop_maze_peer_draw()
 }
 
 // ---------------- stage 7: economy ----------------
+// 0.6.3: one balance check (the original shop also requires RunEarnings >= price)
+function coop_can_afford(_price) { return variable_global_exists("RunEarnings") && global.RunEarnings >= _price; }
+
 function coop_on_upgrade(_id)
 {
     var _E = global.CoopE, _name = "upgrade " + string(_id);
@@ -707,7 +723,16 @@ function coop_more_bot()
         room_goto(_rooms[_M.botMaze - 1]);
     }
     // maze dialogs (FLAGGED: the bot "presses" forward like input_check_pressed(0) in oTextBox.draw_everything)
-    if (_M.botMaze >= 0 || _M.botFace >= 0 || _M.botApproach >= 0 || global.CoopMore.botAdv >= 0) { if (coop_is_maze_room(room) && instance_exists(oTextBox) && current_time - _M.botTxtAt > 700) { _M.botTxtAt = current_time; coop_bot_textbox_forward(); } }
+    if (_M.botMaze >= 0 || _M.botFace >= 0 || _M.botApproach >= 0 || global.CoopMore.botAdv >= 0) { if (coop_is_maze_room(room) && instance_exists(oTextBox) && current_time - _M.botTxtAt > 700)
+    {
+        _M.botTxtAt = current_time;
+        // 0.6.3: shared maze dialogs -> only the host bot presses, as a real press (sent to the partner like coop_tb_step does)
+        if (_c.connected && coop_tb_sync_room())
+        {
+            if (coop_is_host()) { var _l = coop_tb_list(); for (var k = 0; k < array_length(_l); k++) { if (coop_tb_can(_l[k])) { coop_tb_send_press(_l[k]); coop_tb_forward_inst(_l[k]); break; } } }
+        }
+        else { coop_bot_textbox_forward(); }
+    } }
     if (_M.sync && instance_exists(oCamera3DMaze) && !instance_exists(oTextBox))
     {
         var _t = oCamera3DMaze.Frame; // not a clock; use time in room
@@ -744,9 +769,13 @@ function coop_more_bot()
     {
         _E.botBuyDone = true;
         var _before = global.RunEarnings;
-        global.RunEarnings -= 1;
-        acquire_upgrade(1);
-        coop_log("bot: FORCED purchase of upgrade 1 for $1 (money " + string(_before) + " -> " + string(global.RunEarnings) + ")");
+        if (coop_can_afford(1)) // 0.6.3: same balance check as the shop (RunEarnings >= price)
+        {
+            global.RunEarnings -= 1;
+            acquire_upgrade(1);
+            coop_log("bot: FORCED purchase of upgrade 1 for $1 (money " + string(_before) + " -> " + string(global.RunEarnings) + ")");
+        }
+        else { coop_log("bot: purchase of upgrade 1 for $1 REFUSED - not enough money (" + string(_before) + ")"); coop_alert("Not enough money", c_gray, undefined); }
     }
     // partner reached 6 AM while I am still alive in my office (clock drift / forced win): clear the night here too
     if (room == Office && _c.connected && _c.partnerWon && string(_c.partnerWonNight) == string(global.Night) && coop_alive() && (is_numeric(global.Night) || global.Night == "Custom" || global.Night == "Endless"))
@@ -776,12 +805,12 @@ function coop_more_draw()
     var _gw = display_get_gui_width();
     if (room == Office && _c.connected && instance_exists(oSalvage) && global.CoopCfg.bossShared)
     {
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw / 2 - 70, 44, _gw / 2 + 70, 58, false); draw_set_alpha(1);
-        draw_set_color(c_red); draw_set_halign(fa_center); draw_text(_gw / 2, 45, "SHARED BOSS HP " + string(max(0, round(oSalvage.HP))) + "%  P" + string(oSalvage.Phase) + (_B.aggro > 0 ? "  RAGE " + string(_B.aggro) : "")); draw_set_halign(fa_left);
+        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw / 2 - 70, 48, _gw / 2 + 70, 62, false); draw_set_alpha(1);
+        draw_set_color(c_red); draw_set_halign(fa_center); draw_text(_gw / 2, 49, "SHARED BOSS HP " + string(max(0, round(oSalvage.HP))) + "%  P" + string(oSalvage.Phase) + (_B.aggro > 0 ? "  RAGE " + string(_B.aggro) : "")); draw_set_halign(fa_left);
     }
     if (room == Office && _c.connected && instance_exists(oScraptrap))
     {
-        var _ty = (instance_exists(oSalvage) && global.CoopCfg.bossShared) ? 60 : 44;
+        var _ty = (instance_exists(oSalvage) && global.CoopCfg.bossShared) ? 64 : 48; // 0.6.3: below the cam strip (3..28) and the alert banner (31..46)
         draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw / 2 - 80, _ty, _gw / 2 + 80, _ty + 14, false); draw_set_alpha(1);
         draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_gw / 2, _ty + 1, "SHARED TASKS LEFT: " + string(array_length(oScraptrap.Tasks)) + " (partner did " + string(_B.scrapIn) + ")"); draw_set_halign(fa_left);
     }
