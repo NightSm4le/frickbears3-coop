@@ -90,7 +90,8 @@ Bot flags: -coop-botai id=lvl,... -coop-botdoors 0|1 -coop-botcam -coop-botrepel
 Build: sha256 704cb413b9f4a190220ded828b02b6f8c2dff29b228f49f3b0b516e9cfdd0248, VERIFY OK full.
 - Death in coop while partner alive in Office: count_jumpscare skipped (no lives/Deaths spent), oGameOver Create hijacked
   (CoopSpec) -> spectator view: partner's frame streamed over the same TCP socket (binary [u8 1][u32 seq][u16 w][u16 h][u8 lvl][zlib]),
-  per-frame ack, adaptive levels 256x144@5fps .. 96x54@1fps by RTT/in-flight/bandwidth budget (-coop-budget KB/s, default 96).
+  per-frame ack, up to 960x540 at a 60 FPS target; resolution adapts down on RTT/in-flight/bandwidth pressure
+  (-coop-budget KB/s, default 4096). Actual FPS depends on both games' render rate and connection capacity.
   HUD of partner on top, P = ping. Partner reaches 6 AM -> spectator also gets win_night (normal progress on host).
   Both dead -> skipped death is counted, real GameOver on both.
 - Help (Office, partner alive & fresh): G give 10% power (needs >=15, cd 20s, refunded part not accepted),
@@ -100,6 +101,8 @@ Build: sha256 704cb413b9f4a190220ded828b02b6f8c2dff29b228f49f3b0b516e9cfdd0248, 
 - Runs: qa/stage4_run{2..6}_{host,client}.log (run1 crashed on builtin `fps` name, artefacts removed).
 - Limitations: relay lag simulated (botlag); xdotool clicks don't reach the game under Wine (button path untested by real input);
   remote lure only verified as delivered (no active animatronic near on test nights); Endless mode lives untested.
+- Developer mode is a local saved Co-op Settings toggle; in spectate it shows stream level, frame size/rate, RTT,
+  receive rate, last packet size/age, and total received frames. See coop_art/README.md for the custom PNG skin format.
 
 ## 0.4.1 — H warn replaces door help (2026-10-28)
 Door help (H/J close partner's door) REMOVED. H = warn partner: free, cd 20 s; partner sees for 2.8 s a red edge frame+arrow at L/R door,

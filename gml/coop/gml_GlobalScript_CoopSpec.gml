@@ -14,14 +14,15 @@ global.CoopS = {
     frameSurf: -1, fw: 0, fh: 0, framesIn: 0, lastFrameAt: 0, fpsT: 0, fpsN: 0, rfps: 0, inLevel: -1, ackQ: [], botLag: 0,
     // sender
     capSurf: -1, seq: 0, ackSeq: 0, sentAt: array_create(64, 0), level: 2, lastSend: -100000, lastAdapt: 0,
-    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 96, sending: false,
+    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 4096, sending: false,
+    rxBytesWin: 0, rxKbps: 0, rxRateAt: 0, lastFrameSize: 0,
     // help
     cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0,
     botHelp: -1, botHelpStep: 0, botHelpAt: 0, botDie: -1, botDieDone: false, shotPend: "", shotAt: 0, specShot: false, btnShot: false,
     st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, warn: 0, lure: 0, giveIn: 0, warnIn: 0, lureIn: 0, refunds: 0 }
 };
 // [w, h, interval ms]
-#macro COOP_LV [[256, 144, 200], [192, 108, 250], [160, 90, 333], [128, 72, 500], [96, 54, 1000]]
+#macro COOP_LV [[960, 540, 16], [640, 360, 16], [480, 270, 16], [320, 180, 16], [256, 144, 16]]
 
 function coop_spec_parse_args()
 {
@@ -63,6 +64,8 @@ function coop_spec_gameover_create()
     {
         _s.spec = true; _s.specSince = current_time; _s.partnerDeadSince = -1; _s.st.specIn++;
         _s.framesIn = 0; _s.inLevel = -1; _s.ackQ = [];
+        _s.fpsN = 0; _s.rfps = 0; _s.fpsT = current_time;
+        _s.rxBytesWin = 0; _s.rxKbps = 0; _s.rxRateAt = current_time; _s.lastFrameSize = 0;
         application_surface_draw_enable(true);
         coop_log("SPECTATOR: watching partner (GameOver screen suppressed)");
         return true;
@@ -156,11 +159,11 @@ function coop_stream_tick()
         _s.kbps = _s.bytesWin / 1024 / ((current_time - _s.lastAdapt) / 1000);
         _s.bytesWin = 0; _s.lastAdapt = current_time;
         var _old = _s.level;
-        if ((_s.lat > 400 || _s.kbps > _s.budget || _inflight >= 2) && _s.level < 4) { _s.level++; _s.st.levelDown++; }
-        else if (_s.lat >= 0 && _s.lat < 150 && _inflight == 0 && _s.kbps < _s.budget * 0.5 && _s.level > 0) { _s.level--; _s.st.levelUp++; }
+        if ((_s.lat > 400 || _s.kbps > _s.budget || _inflight >= 24) && _s.level < 4) { _s.level++; _s.st.levelDown++; }
+        else if (_s.lat >= 0 && _s.lat < 150 && _inflight < 16 && _s.kbps < _s.budget * 0.5 && _s.level > 0) { _s.level--; _s.st.levelUp++; }
         if (_old != _s.level) { coop_log("stream: level " + string(_old) + " -> " + string(_s.level) + " (" + string(_lv[_s.level][0]) + "x" + string(_lv[_s.level][1]) + " every " + string(_lv[_s.level][2]) + "ms; ack lat " + string(round(_s.lat)) + "ms, " + string_format(_s.kbps, 1, 1) + " KB/s, inflight " + string(_inflight) + ")"); }
     }
-    if (_inflight >= 2) { if (current_time - _s.lastSend > 4000) { _s.ackSeq = _s.seq; coop_log("stream: acks stalled 4s, resync"); } return; }
+    if (_inflight >= 32) { if (current_time - _s.lastSend > 4000) { _s.ackSeq = _s.seq; coop_log("stream: acks stalled 4s, resync"); } return; }
     if (current_time - _s.lastSend < _lv[_s.level][2]) { return; }
     var _w = _lv[_s.level][0], _h = _lv[_s.level][1];
     var _src = surface_exists(global.UISurface) ? global.UISurface : application_surface;
@@ -215,6 +218,9 @@ function coop_stream_on_frame(_b, _size)
         if (!surface_exists(_s.frameSurf) || surface_get_width(_s.frameSurf) != _w) { if (surface_exists(_s.frameSurf)) { surface_free(_s.frameSurf); } _s.frameSurf = surface_create(_w, _h); }
         buffer_set_surface(_d, _s.frameSurf, 0);
         _s.fw = _w; _s.fh = _h; _s.framesIn++; _s.st.framesIn++; _s.fpsN++; _s.lastFrameAt = current_time;
+        _s.rxBytesWin += _size; _s.lastFrameSize = _size;
+        var _rateElapsed = current_time - _s.rxRateAt;
+        if (_rateElapsed >= 1000) { _s.rxKbps = _s.rxBytesWin / 1024 / (_rateElapsed / 1000); _s.rxBytesWin = 0; _s.rxRateAt = current_time; }
         if (_s.inLevel != _lvl) { coop_log("stream: receiving level " + string(_lvl) + " " + string(_w) + "x" + string(_h) + " (" + string(_size) + " bytes/frame)"); _s.inLevel = _lvl; }
     }
     buffer_delete(_d);
@@ -238,7 +244,7 @@ function coop_spec_draw()
     var _pw = coop_partner_get("pw", 0);
     var _view = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "OFFICE";
     if (coop_partner_get("mk", 0)) { _view = "MASK"; } if (coop_partner_get("pu", 0)) { _view = "PANEL"; }
-    draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(0, 0, _gw, 14, false); draw_rectangle(0, _gh - 14, _gw, _gh, false); draw_set_alpha(1);
+    draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(0, 0, _gw, 14, false); draw_set_alpha(1);
     draw_set_color(((current_time div 600) mod 2) ? c_red : c_white); draw_text(4, 1, "SPECTATING PARTNER");
     draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(2, 16, 54, 74, false); draw_set_alpha(1);
     coop_art_partner_portrait(4, 18, 48, 1);
@@ -247,10 +253,24 @@ function coop_spec_draw()
     draw_text(140, 1, string(_hr) + " AM   power " + string(floor(max(_pw, 0))) + "%   doors " + (coop_partner_get("d0", 0) ? "L" : "-") + (coop_partner_get("d1", 0) ? "R" : "-") + "   " + _view);
     draw_set_color(c_ltgray);
     var _age = current_time - _s.lastFrameAt;
-    draw_text(4, _gh - 13, "P ping   M mark partner's cam   you die only if both die; partner 6 AM = night cleared");
+    draw_set_alpha(0.72); draw_set_color(c_black); draw_rectangle(0, _gh - 32, _gw, _gh, false); draw_set_alpha(1);
+    draw_set_color(c_ltgray);
+    draw_text(4, _gh - 29, "P: ping    M: mark partner's camera");
     draw_set_halign(fa_right);
     draw_text(_gw - 4, _gh - 13, string(_s.fw) + "x" + string(_s.fh) + " " + string_format(_s.rfps, 1, 1) + "fps" + ((_c.rtt >= 0) ? " " + string(_c.rtt) + "ms" : "") + ((_age > 2000 && _s.framesIn > 0) ? " (stalled)" : ""));
     draw_set_halign(fa_left);
+    draw_text(4, _gh - 15, "Both players must die for Game Over | 6 AM wins");
+    if (global.CoopCfg.devMode)
+    {
+        var _dx = max(4, _gw - 274), _dy = 18, _rtt = (_c.rtt >= 0) ? string(_c.rtt) : "--";
+        draw_set_alpha(0.82); draw_set_color(c_black); draw_rectangle(_dx, _dy, _gw - 4, _dy + 76, false); draw_set_alpha(1);
+        draw_set_color(c_yellow); draw_text(_dx + 6, _dy + 3, "DEV STREAM  level " + string(max(_s.inLevel, 0)));
+        draw_set_color(c_white);
+        draw_text(_dx + 6, _dy + 17, "Frame: " + string(_s.fw) + "x" + string(_s.fh) + "  " + string_format(_s.rfps, 1, 1) + " FPS");
+        draw_text(_dx + 6, _dy + 31, "RTT: " + _rtt + " ms  rate: " + string_format(_s.rxKbps, 1, 1) + " KB/s");
+        draw_text(_dx + 6, _dy + 45, "Packet: " + string(_s.lastFrameSize) + " B  age: " + string(_age) + " ms");
+        draw_text(_dx + 6, _dy + 59, "Frames received: " + string(_s.framesIn));
+    }
     if (current_time - _c.lastPingSent < 1500) { draw_set_color(c_yellow); draw_text(4, 16, "ping sent!"); }
     coop_draw_alerts();
 }
