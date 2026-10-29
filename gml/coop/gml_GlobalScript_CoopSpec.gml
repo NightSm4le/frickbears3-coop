@@ -14,7 +14,7 @@ global.CoopS = {
     frameSurf: -1, fw: 0, fh: 0, framesIn: 0, lastFrameAt: 0, fpsT: 0, fpsN: 0, rfps: 0, inLevel: -1, ackQ: [], botLag: 0,
     // sender
     capSurf: -1, seq: 0, ackSeq: 0, sentAt: array_create(64, 0), level: 2, lastSend: -100000, lastAdapt: 0,
-    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 4096, sending: false,
+    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 65536, sending: false,
     rxBytesWin: 0, rxKbps: 0, rxRateAt: 0, lastFrameSize: 0,
     // help
     cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0,

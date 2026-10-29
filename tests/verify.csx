@@ -46,5 +46,6 @@ if (stage == "full")
     need(more.Contains("expected six 32x64 frames"), "custom co-op art validation missing");
     var spec = D("gml_GlobalScript_CoopSpec");
     need(spec.Contains("DEV STREAM") && spec.Contains("Frames received"), "spectator developer diagnostics missing");
+    need(spec.Contains("budget: 65536"), "high-bandwidth spectator budget missing");
 }
 Console.WriteLine(bad.Count == 0 ? "VERIFY OK " + stage : "VERIFY FAIL: " + string.Join("; ", bad));
