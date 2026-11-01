@@ -38,6 +38,12 @@ function coop_feat_parse_args()
     }
 }
 
+function coop_admin_save_active()
+{
+    return variable_global_exists("CoopAdmin") && variable_struct_exists(global.CoopAdmin, "enabled")
+        && global.CoopAdmin.enabled && global.CoopAdmin.saveReady && global.CoopSaveTag == "_coop_admin";
+}
+
 // ---------------- co-op saves ----------------
 // SaveData file names get global.CoopSaveTag appended (apply.csx). In co-op it is "_coop": the original
 // savedata/records/endlessdata are never read or written again till co-op ends at the title screen.
@@ -578,7 +584,7 @@ function coop_feat_packet(_t, _m)
 function coop_feat_step()
 {
     var _f = global.CoopF, _c = global.Coop, _s = global.CoopS;
-    if (global.CoopSaveTag != "" && _c.mode == "off" && _c.rjLeft <= 0 && room == TitleScreenMap) { coop_save_leave(); } // 0.6.2: not while auto-reconnecting
+    if (global.CoopSaveTag != "" && _c.mode == "off" && _c.rjLeft <= 0 && room == TitleScreenMap && !coop_admin_save_active()) { coop_save_leave(); } // 0.6.2: not while auto-reconnecting
     if (variable_struct_exists(_f, "unlockAll") && _f.unlockAll && global.CoopSaveTag != "") { coop_unlock_all(); }
     if (!_c.connected) { return; }
     // marks: M on cameras (alive) or as spectator (marks what the partner is watching)
