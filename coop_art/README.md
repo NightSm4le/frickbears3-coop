@@ -28,6 +28,10 @@ It reads the first panel of `selection.png` for the static maze character, and u
 
 The Grike/SEAR archive uses this separate game add-on format. Its character-selection art can be imported as a static skin; the archive does not include directional walk frames, so animation requires editing the six-frame PNG.
 
+## Night location card
+
+When both players are connected, the pre-night location card displays a small labeled avatar for each player. For a character add-on, the game looks up that player's selected guard name and loads `addons/<guard name>/selection.png` as the avatar. Install the same guard add-on on both computers so each game can display the other player's sprite. If the add-on image is not present locally, the card falls back to the player's configured co-op portrait skin. This does not change the game's underlying guard selection or add-on data.
+
 ## Install
 
 1. Make a folder named `coop_art` beside the game's executable.

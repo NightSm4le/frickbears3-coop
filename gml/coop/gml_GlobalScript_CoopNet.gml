@@ -439,6 +439,7 @@ function coop_alive()
 function coop_snapshot()
 {
     var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive(), sp: global.CoopS.spec ? 1 : 0, sc: coop_score_arr() };
+    if (variable_global_exists("Guard") && is_numeric(global.Guard)) { _s.gn = guard_name(global.Guard); }
     if (variable_global_exists("TimeOfDeath") && is_numeric(global.TimeOfDeath)) { _s.tod = global.TimeOfDeath; }
     if (room == Office)
     {

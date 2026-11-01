@@ -64,7 +64,11 @@ if (stage == "full")
     need(moreChecks.Contains("SCRAPTRAP: ") && moreChecks.Contains("instance_find(oCamera3DMaze"), "shared task explanation or guarded maze HUD missing");
     var ui = D("gml_GlobalScript_CoopUI");
     need(ui.Contains("coop_draw_scene_participants") && ui.Contains("P\" + string(_me)"), "co-op participants are not shown during story dialogs");
+    need(ui.Contains("function coop_draw_night_participants()") && ui.Contains("coop_scene_mod_sprite(_otherName)"), "both players are not drawn on the night location card");
+    need(ui.Contains("addons/") && ui.Contains("/selection.png") && ui.Contains("sprite_add(_path, 2"), "location card does not load a modded guard selection sprite");
+    need(ui.Contains("string_pos(\"..\", arg0)") && ui.Contains("string_pos(\"\\\\\", arg0)"), "remote mod sprite path is not validated");
     need(ui.Contains(": \"SEATED\""), "co-op HUD does not indicate the partner is seated in the Office");
+    need(net.Contains("_s.gn = guard_name(global.Guard)"), "partner guard name is not sent for mod sprite lookup");
     need(net.Contains("function coop_pause_packet") && net.Contains("t: \"pause\""), "synchronized pause protocol missing");
     need(net.Contains("array_create(_need, 0)") && net.Contains("while (array_length(global.Deaths) < _need)"), "Deaths array is not initialized for the selected character");
     need(ss.Contains("coop_prepare_night();\n    if (coop_spec_skip_count(arg0))"), "death path does not initialize the Deaths array");

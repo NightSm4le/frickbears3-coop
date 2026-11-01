@@ -161,6 +161,11 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
 - `scripts/import_addon_skin.py` converts a game's static selection art to a six-frame co-op billboard and imports its portrait/icon;
   animated skins can be edited in the documented 192x64 template format.
 
+## 0.6.6 — two-player night location card
+- The pre-night location card now draws both players with P1/P2 labels.
+- Each side sends its selected guard name; when the matching `addons/<guard name>/selection.png` exists locally, that add-on sprite is used. Missing or invalid remote names fall back to the configured co-op portrait.
+- Both players need the same add-on installed to see its sprite. This only changes the card display, not which guard the game has selected.
+
 ## v2.1.5 migration work
 - `scripts/build.ps1` builds from a supplied clean `data.win` without replacing it, then runs `tests/verify.csx`.
 - Fixed missing co-op settings context, dialogue `game_text` instance binding, and initialization/extension of the Deaths array for custom guards.
