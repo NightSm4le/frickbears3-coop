@@ -24,6 +24,7 @@ global.Coop = {
     autoNight: -1,
     logFile: "coop.log",
     lastClockSend: 0,
+    lastClientClockReset: -100000,
     hostTimer: -1,
     hostNight: undefined,
     partnerWon: false,
@@ -375,6 +376,17 @@ function coop_on_packet(_m)
                 else { global.Timer += _d * 0.25; }
             }
             break;
+        case "clockrewind": // host: client used its own Ultra Clock; apply the same fixed game effect
+            if (coop_is_host() && room == Office && variable_global_exists("NightSpeedup")
+                && is_numeric(global.NightSpeedup) && global.NightSpeedup > 0
+                && current_time - _c.lastClientClockReset > 1000)
+            {
+                _c.lastClientClockReset = current_time;
+                global.Timer = 360 - (360 / global.NightSpeedup);
+                coop_log("CLOCK: client used Ultra Clock; host timer reset to " + string(global.Timer));
+            }
+            else { coop_log("CLOCK: rejected invalid, out-of-room, or duplicate client rewind"); }
+            break;
         case "snap": // partner office state, ~10 per second
             _c.partner = _m;
             _c.partnerSnapAt = current_time;
@@ -409,6 +421,24 @@ function coop_on_packet(_m)
         default:
             if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m) && !coop_s3_packet(_t, _m) && !coop_s4_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
+}
+
+function coop_clock_rewind()
+{
+    if (!variable_global_exists("Timer") || !variable_global_exists("NightSpeedup")
+        || !is_numeric(global.NightSpeedup) || global.NightSpeedup <= 0)
+    {
+        coop_log("CLOCK: Ultra Clock could not read a valid night speed");
+        return false;
+    }
+
+    global.Timer = 360 - (360 / global.NightSpeedup);
+    if (coop_active() && global.Coop.connected)
+    {
+        if (coop_is_client()) { coop_send({ t: "clockrewind" }); }
+        coop_log("CLOCK: Ultra Clock used locally; shared timer request sent=" + string(coop_is_client()));
+    }
+    return true;
 }
 
 function coop_drop_partner(_why)

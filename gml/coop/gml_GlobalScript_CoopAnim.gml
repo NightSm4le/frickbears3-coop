@@ -483,7 +483,12 @@ function coop_anim_packet(_t, _m)
                 coop_alert("Partner's lure pulled " + coop_anim_name(_best) + " away", c_lime, sfxBitCollect);
                 coop_send({ t: "lured", id: _best });
             }
-            else { coop_log("lure from partner: no effect (candidate " + coop_anim_name(_best) + ")"); coop_send({ t: "lured", id: -1 }); }
+            else
+            {
+                coop_log("lure from partner: no effect (candidate " + coop_anim_name(_best) + ")");
+                if (room == Office && coop_alive()) { coop_alert("Lure had no effect (no nearby target or the lure missed)", c_gray, undefined); }
+                coop_send({ t: "lured", id: -1 });
+            }
             return true;
         case "lured":
             if (_id >= 0)
@@ -492,7 +497,11 @@ function coop_anim_packet(_t, _m)
                 coop_alert("Your lure pulled " + coop_anim_name(_id) + " from partner!", c_lime, sfxBitCollect);
                 if (room == Office && coop_anim_inst(_id) != noone) { coop_anim_boost(_id, 3, 30000, "came for my lure"); }
             }
-            else { coop_log("my lure had no effect at partner"); }
+            else
+            {
+                coop_log("my lure had no effect at partner");
+                if (room == Office && coop_alive()) { coop_alert("Lure had no effect at partner (no nearby target or the lure missed)", c_gray, undefined); }
+            }
             return true;
         case "died":
             coop_log("partner died, killer " + _name);

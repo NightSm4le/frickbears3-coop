@@ -2,6 +2,7 @@
 using System; using System.Linq;
 EnsureDataLoaded();
 string stage = Environment.GetEnvironmentVariable("COOP_STAGE") ?? "full";
+bool adminCheats = Environment.GetEnvironmentVariable("COOP_CHEATS") == "1";
 var bad = new System.Collections.Generic.List<string>();
 void need(bool c, string m) { if (!c) bad.Add(m); }
 need(Data.Code.ByName("gml_Object_oSuperGameManager_Create_0") != null, "SGM create missing");
@@ -43,8 +44,12 @@ if (stage == "full")
     var net = D("gml_GlobalScript_CoopNet");
     need(net.Split("coop_save_enter()").Length - 1 >= 2, "coop_save_enter not called from host+join");
     need(net.Contains("coop_feat_packet("), "feature packets not dispatched");
+    need(net.Contains("case \"clockrewind\"") && net.Contains("function coop_clock_rewind()"), "Ultra Clock timer effect is not synchronized through the host");
+    need(D("gml_Object_oShopItemUltra_Clock_Draw_77").Contains("coop_clock_rewind()"), "Ultra Clock use hook missing");
+    need(net.Contains("client used Ultra Clock; host timer reset"), "host did not apply the client's Ultra Clock effect");
     var more = D("gml_GlobalScript_CoopMore");
     need(more.Contains("devmode") && more.Contains("Developer mode: "), "saved developer mode setting missing");
+    need(more.Contains("var _g = global.CoopCfg;") && more.Contains("Co-op settings. Host decides for both;"), "Co-op Settings description scope guard missing");
     need(more.Contains("expected six 32x64 frames"), "custom co-op art validation missing");
     var spec = D("gml_GlobalScript_CoopSpec");
     need(spec.Contains("DEV STREAM") && spec.Contains("Frames received"), "spectator developer diagnostics missing");
@@ -52,8 +57,10 @@ if (stage == "full")
     need(spec.Contains("level: 3") && spec.Contains("if (_inflight >= 2)"), "spectator stream is not rate-limited to protect control traffic");
     need(spec.Contains("1920, 1080") && spec.Contains("1280, 720"), "1080p adaptive spectator levels missing");
     need(spec.Contains("specgiveack") && spec.Contains("POWER USED"), "spectator once-per-night power assist missing");
+    need(spec.Contains("Lure sent to partner; it only works on a nearby animatronic") && spec.Contains("L (partner)"), "L action purpose is unclear");
     need(!spec.Contains("keyboard_check_pressed(ord(\"H\"))") && !spec.Contains("\"H !\""), "H warning binding still exposed");
     var anim = D("gml_GlobalScript_CoopAnim");
+    need(anim.Contains("no nearby target or the lure missed"), "L lure failure feedback missing");
     need(anim.Contains("attack token is reserved for partner") && anim.Contains("cancelled until host grants token"), "shared animatronic token race guards missing");
     need(anim.Contains("emergency claim at jumpscare gate") && anim.Contains("_a.granted[_id]") && anim.Contains("client is using host grant"), "jumpscare gate does not require and retain host token grant");
     need(anim.Contains("name: coop_anim_name(_a.lastKiller)") && anim.Contains("Partner killed by \" + _name"), "killer name is not preserved across clients");
@@ -77,5 +84,16 @@ if (stage == "full")
         var pz = D(n);
         need(pz.Contains("coop_pause_requested()") && pz.Contains("coop_pause_on_close()"), n + " pause sync hooks missing");
     }
+    if (adminCheats)
+    {
+        need(Data.Code.ByName("gml_GlobalScript_CoopAdmin") != null, "admin cheats script missing");
+        need(D("gml_Object_oCoopNet_Step_0").Contains("coop_admin_step()"), "admin cheats step hook missing");
+        need(D("gml_Object_oCoopNet_Draw_75").Contains("coop_admin_draw()"), "admin cheats HUD hook missing");
+        need(D("gml_Object_oCoopNet_Create_0").Contains("saveTagArg = \"_admin\""), "admin save slot is not isolated");
+        need(D("gml_GlobalScript_CoopFeat").Contains("!coop_admin_save_active()"), "admin save slot is not retained");
+        Console.WriteLine(bad.Count == 0 ? "VERIFY OK full-admin" : "VERIFY FAIL: " + string.Join("; ", bad));
+        return;
+    }
+    need(Data.Code.ByName("gml_GlobalScript_CoopAdmin") == null, "admin cheats leaked into the standard build");
 }
 Console.WriteLine(bad.Count == 0 ? "VERIFY OK " + stage : "VERIFY FAIL: " + string.Join("; ", bad));

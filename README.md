@@ -1,3 +1,13 @@
-# frickbears-coop (WIP)
-2-player co-op mod for Five Nights at Frickbear's 3 + Four Layers Down v2.0.2 (GameMaker VM).
-Contains only original mod code and UndertaleModTool scripts; NO game files. Build: `./build.sh full` (needs a clean data.win at ../clean/data.win and UndertaleModCli). See NOTES.md.
+# frickbears-coop
+
+Two-player co-op mod for Five Nights at Frickbear's 3 + Four Layers Down v2.1.5 (GameMaker VM). The repository contains mod source and UndertaleModTool scripts, not the game's `data.win` or other game assets.
+
+On Windows, build from a clean v2.1.5 `data.win` with UndertaleModTool CLI:
+
+```powershell
+.\scripts\build.ps1 -BaseData "C:\path\to\clean\data.win" -UndertaleModCli "C:\path\to\UndertaleModCli.exe"
+```
+
+An optional, separate local admin build is available with `-AdminCheats`. It writes to a different output file and uses an isolated save slot. It is not a secure account-based admin system; do not share that build.
+
+See [Руководство по коопу](Гайд_коопа/README_RU.md) for installation, custom character art, admin-build details, and the upgrade process for future game versions. See [custom co-op skin formats](coop_art/README.md) for PNG dimensions and the add-on importer.

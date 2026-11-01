@@ -1,5 +1,5 @@
 // Applies the coop mod to a CLEAN data.win loaded by UndertaleModCli.
-// Env: COOP_MOD_DIR (mod repo root), COOP_STAGE = noop | log | full
+// Env: COOP_MOD_DIR (mod repo root), COOP_STAGE = noop | log | full, COOP_CHEATS = 0 | 1
 using System;
 using System.IO;
 using System.Linq;
@@ -8,12 +8,14 @@ using UndertaleModLib.Compiler;
 EnsureDataLoaded();
 string modDir = Environment.GetEnvironmentVariable("COOP_MOD_DIR");
 string stage = Environment.GetEnvironmentVariable("COOP_STAGE") ?? "full";
+bool adminCheats = Environment.GetEnvironmentVariable("COOP_CHEATS") == "1";
 if (modDir == null) throw new Exception("COOP_MOD_DIR not set");
-Console.WriteLine($"[apply] stage={stage} game={Data.GeneralInfo.DisplayName.Content}");
+Console.WriteLine($"[apply] stage={stage} adminCheats={adminCheats} game={Data.GeneralInfo.DisplayName.Content}");
 if (stage == "noop") { Console.WriteLine("[apply] noop: resave only"); return; }
 
 var dirs = new System.Collections.Generic.List<string> { Path.Combine(modDir, "gml", "boot") };
 if (stage == "full") dirs.Add(Path.Combine(modDir, "gml", "coop"));
+if (stage == "full" && adminCheats) dirs.Add(Path.Combine(modDir, "gml", "admin"));
 
 // v2.1.5 changed several vanilla code bodies; verify the resulting hooks with tests/verify.csx
 // instead of aborting on the first optional legacy replacement that no longer matches.
@@ -27,6 +29,13 @@ foreach (var d in dirs)
 
 if (stage == "full")
 {
+    if (adminCheats)
+    {
+        g.QueueFindReplace("gml_Object_oCoopNet_Create_0", "coop_parse_args();",
+            "global.CoopF.saveTagArg = \"_admin\";\ncoop_parse_args();");
+        g.QueueAppend("gml_Object_oCoopNet_Step_0", "\ncoop_admin_step();\n");
+        g.QueueAppend("gml_Object_oCoopNet_Draw_75", "\ncoop_admin_draw();\n");
+    }
     // spawn the persistent network object from the persistent game manager (StartupRoom)
     g.QueueAppend("gml_Object_oSuperGameManager_Create_0",
         "\nif (!instance_exists(oCoopNet)) { instance_create_depth(0, 0, -10000, oCoopNet); }\n");
@@ -55,6 +64,9 @@ if (stage == "full")
     }
     // host: report night win to the partner
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function win_night()\n{", "function win_night()\n{\n    coop_on_win_night();");
+    // Ultra Clock is used locally; ask the host to apply the same fixed timer reset before its next clock sync.
+    g.QueueFindReplace("gml_Object_oShopItemUltra_Clock_Draw_77",
+        "global.Timer = 360 - (360 / global.NightSpeedup);", "coop_clock_rewind();");
     // Endless picker can select custom guard 21; extend both history arrays before indexing it.
     g.QueueFindReplace("gml_Object_oEndless_DifficultyPicker_Draw_0",
         "if (GuardID >= array_length(global.RunsAttempted))\n            {\n                for (var g = 21; g < 22; g++)\n                {\n                    for (var d = 0; d < 5; d++)\n                    {\n                        global.RunsAttempted[g][d] = 0;\n                        global.RunsWon[g][d] = 0;\n                    }\n                }\n            }",

@@ -376,7 +376,7 @@ function coop_help_do(_what, _src)
             if (_now < _s.cdLure) { coop_alert("Remote lure: cooldown " + string(ceil((_s.cdLure - _now) / 1000)) + "s", c_gray, undefined); return false; }
             _s.cdLure = _now + 15000; _s.st.lure++; // 0.5.0: free (no power cost)
             coop_send({ t: "rlure" });
-            coop_alert("Remote lure played in partner's office", c_lime, sfxBitCollect);
+            coop_alert("Lure sent to partner; it only works on a nearby animatronic", c_lime, sfxBitCollect);
             break;
         default: return false;
     }
@@ -442,7 +442,7 @@ function coop_help_packet(_t, _m)
         case "rlure":
             _s.st.lureIn++;
             coop_log("help: partner played a remote lure here");
-            if (room == Office && coop_alive()) { coop_alert("Partner played a lure on your cameras", c_lime, undefined); }
+            if (room == Office && coop_alive()) { coop_alert("Partner played a lure here; checking for a nearby animatronic", c_lime, undefined); }
             var _old = global.CoopA.lureChance; global.CoopA.lureChance = 80;
             coop_anim_packet("lure", _m);
             global.CoopA.lureChance = _old;
@@ -492,7 +492,7 @@ function coop_help_buttons(_px, _py, _w)
 {
     var _bw = (_w - 2) / 2, _y1 = _py + 31, _y2 = _py + 46;
     var _r = [];
-    var _def = [["give", "G+pw"], ["lure", "L lure"]];
+    var _def = [["give", "G+pw"], ["lure", "L (partner)"]];
     for (var i = 0; i < 2; i++) { var _x1 = _px + i * (_bw + 2); array_push(_r, [_x1, _y1, _x1 + _bw, _y2, _def[i][0], _def[i][1]]); }
     return _r;
 }
