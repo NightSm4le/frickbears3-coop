@@ -33,6 +33,8 @@ if (stage == "full")
     need(D("gml_Object_oGameOver_Draw_0").Contains("CoopSpec"), "GameOver draw hook missing");
     need(D("gml_Object_oGameOver_CleanUp_0").Contains("CoopSpec"), "GameOver cleanup hook missing");
     need(D("gml_Object_oCoopNet_Other_68").Contains("coop_stream_on_frame"), "binary frame branch missing");
+    var endlessPicker = D("gml_Object_oEndless_DifficultyPicker_Draw_0");
+    need(endlessPicker.Contains("while (array_length(global.RunsAttempted) <= GuardID)") && endlessPicker.Contains("while (array_length(global.RunsWon) <= GuardID)"), "Endless custom-guard run-history bounds fix missing");
     // 0.5.0: co-op save redirect + features
     need(dec.Split("global.CoopSaveTag").Length - 1 >= 9, "co-op save tag not on every save file name");
     need(!dec.Contains("global.CurrentVersion + \".wario\"") && !dec.Contains("global.CurrentVersion + \".txt\""), "untagged save file name left");
@@ -46,7 +48,34 @@ if (stage == "full")
     need(more.Contains("expected six 32x64 frames"), "custom co-op art validation missing");
     var spec = D("gml_GlobalScript_CoopSpec");
     need(spec.Contains("DEV STREAM") && spec.Contains("Frames received"), "spectator developer diagnostics missing");
-    need(spec.Contains("budget: 65536"), "high-bandwidth spectator budget missing");
+    need(spec.Contains("budget: 512"), "spectator bandwidth budget missing");
+    need(spec.Contains("level: 3") && spec.Contains("if (_inflight >= 2)"), "spectator stream is not rate-limited to protect control traffic");
     need(spec.Contains("1920, 1080") && spec.Contains("1280, 720"), "1080p adaptive spectator levels missing");
+    need(spec.Contains("specgiveack") && spec.Contains("POWER USED"), "spectator once-per-night power assist missing");
+    need(!spec.Contains("keyboard_check_pressed(ord(\"H\"))") && !spec.Contains("\"H !\""), "H warning binding still exposed");
+    var anim = D("gml_GlobalScript_CoopAnim");
+    need(anim.Contains("attack token is reserved for partner") && anim.Contains("cancelled until host grants token"), "shared animatronic token race guards missing");
+    need(anim.Contains("emergency claim at jumpscare gate") && anim.Contains("_a.granted[_id]") && anim.Contains("client is using host grant"), "jumpscare gate does not require and retain host token grant");
+    need(anim.Contains("name: coop_anim_name(_a.lastKiller)") && anim.Contains("Partner killed by \" + _name"), "killer name is not preserved across clients");
+    var sync = D("gml_GlobalScript_CoopSync");
+    need(sync.Contains("tbreq") && sync.Contains("coop_tb_request(arg1)"), "host-authoritative dialogue input missing");
+    need(sync.Contains("method(id, game_text)"), "dialogue branch does not bind game_text to its textbox");
+    var moreChecks = D("gml_GlobalScript_CoopMore");
+    need(moreChecks.Contains("SCRAPTRAP: ") && moreChecks.Contains("instance_find(oCamera3DMaze"), "shared task explanation or guarded maze HUD missing");
+    var ui = D("gml_GlobalScript_CoopUI");
+    need(ui.Contains("coop_draw_scene_participants") && ui.Contains("P\" + string(_me)"), "co-op participants are not shown during story dialogs");
+    need(ui.Contains("function coop_draw_night_participants()") && ui.Contains("coop_scene_mod_sprite(_otherName)"), "both players are not drawn on the night location card");
+    need(ui.Contains("addons/") && ui.Contains("/selection.png") && ui.Contains("sprite_add(_path, 2"), "location card does not load a modded guard selection sprite");
+    need(ui.Contains("string_pos(\"..\", arg0)") && ui.Contains("string_pos(\"\\\\\", arg0)"), "remote mod sprite path is not validated");
+    need(ui.Contains(": \"SEATED\""), "co-op HUD does not indicate the partner is seated in the Office");
+    need(net.Contains("_s.gn = guard_name(global.Guard)"), "partner guard name is not sent for mod sprite lookup");
+    need(net.Contains("function coop_pause_packet") && net.Contains("t: \"pause\""), "synchronized pause protocol missing");
+    need(net.Contains("array_create(_need, 0)") && net.Contains("while (array_length(global.Deaths) < _need)"), "Deaths array is not initialized for the selected character");
+    need(ss.Contains("coop_prepare_night();\n    if (coop_spec_skip_count(arg0))"), "death path does not initialize the Deaths array");
+    foreach (var n in new[] { "gml_Object_oPauser_Step_2", "gml_Object_oPersistentPauser_Step_2" })
+    {
+        var pz = D(n);
+        need(pz.Contains("coop_pause_requested()") && pz.Contains("coop_pause_on_close()"), n + " pause sync hooks missing");
+    }
 }
 Console.WriteLine(bad.Count == 0 ? "VERIFY OK " + stage : "VERIFY FAIL: " + string.Join("; ", bad));

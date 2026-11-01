@@ -5,24 +5,24 @@
 // with adaptive size/rate driven by acks (works through a Porthole relay: slower acks -> smaller/rarer frames).
 // Partner reaches 6 AM -> win_night() here too (normal progress on the host). Partner dies too -> the
 // skipped death is counted now and the real GameOver screen appears for both.
-// Help: G = give 10% power, H = warn partner (flash where their threat is; free, cd 20 s),
-// L = remote audio lure in partner's office. Small native buttons under the mini-window do the same.
+// Help: G = give power, L = remote audio lure in partner's office. Small native buttons do the same.
 
 global.CoopS = {
     spec: false, armed: false, skipped: false, killer: -1, specSince: 0, partnerDeadSince: -1,
     // receiver
     frameSurf: -1, fw: 0, fh: 0, framesIn: 0, lastFrameAt: 0, fpsT: 0, fpsN: 0, rfps: 0, inLevel: -1, ackQ: [], botLag: 0,
     // sender
-    capSurf: -1, seq: 0, ackSeq: 0, sentAt: array_create(64, 0), level: 2, lastSend: -100000, lastAdapt: 0,
-    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 65536, sending: false,
+    capSurf: -1, seq: 0, ackSeq: 0, sentAt: array_create(64, 0), level: 3, lastSend: -100000, lastAdapt: 0,
+    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 512, sending: false,
     rxBytesWin: 0, rxKbps: 0, rxRateAt: 0, lastFrameSize: 0,
     // help
     cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0,
+    specGiveUsedKey: "", specGiveRecvKey: "", specGivePending: false, specGiveRequestKey: "",
     botHelp: -1, botHelpStep: 0, botHelpAt: 0, botDie: -1, botDieDone: false, shotPend: "", shotAt: 0, specShot: false, btnShot: false,
     st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, warn: 0, lure: 0, giveIn: 0, warnIn: 0, lureIn: 0, refunds: 0 }
 };
 // [w, h, interval ms]
-#macro COOP_LV [[1920, 1080, 16], [1280, 720, 16], [960, 540, 16], [640, 360, 16], [480, 270, 16], [320, 180, 16], [256, 144, 16]]
+#macro COOP_LV [[1920, 1080, 120], [1280, 720, 100], [960, 540, 100], [640, 360, 100], [480, 270, 100], [320, 180, 120], [256, 144, 150]]
 
 function coop_spec_parse_args()
 {
@@ -42,6 +42,45 @@ function coop_partner_alive_in_office()
     var _c = global.Coop;
     return _c.connected && current_time - _c.partnerSnapAt < 3000 && coop_partner_get("rm", "") == "Office"
         && coop_partner_get("alive", false) && !coop_partner_get("sp", 0) && !_c.partnerWon;
+}
+
+function coop_spec_round_key()
+{
+    var _key = variable_global_exists("Night") ? string(global.Night) : "night";
+    if (variable_global_exists("EndlessRound")) { _key += ":" + string(global.EndlessRound); }
+    return _key;
+}
+
+function coop_spec_give_power(_src)
+{
+    var _s = global.CoopS, _c = global.Coop;
+    if (!_s.spec || room != GameOver || !_c.connected) { return false; }
+    if (!coop_partner_alive_in_office()) { coop_alert("Power: partner is not in the office", c_gray, undefined); return false; }
+    var _key = coop_spec_round_key();
+    if (_s.specGiveUsedKey == _key) { coop_alert("Spectator power was already sent this night", c_gray, undefined); return false; }
+    if (_s.specGivePending) { coop_alert("Power transfer is still pending", c_gray, undefined); return false; }
+    _s.specGivePending = true; _s.specGiveRequestKey = _key;
+    coop_send({ t: "specgive", night: _key });
+    coop_log("SPECTATOR: power request sent (" + _src + "), night " + _key);
+    return true;
+}
+
+function coop_spec_give_button_rect()
+{
+    var _gw = display_get_gui_width(), _gh = display_get_gui_height();
+    return [_gw / 2 - 72, _gh - 58, _gw / 2 + 72, _gh - 35];
+}
+
+function coop_spec_give_click()
+{
+    var _s = global.CoopS;
+    if (!_s.spec || room != GameOver || !mouse_check_button_pressed(mb_left)) { return; }
+    var _r = coop_spec_give_button_rect(), _mx = device_mouse_x_to_gui(0), _my = device_mouse_y_to_gui(0);
+    if (point_in_rectangle(_mx, _my, _r[0], _r[1], _r[2], _r[3]))
+    {
+        coop_spec_give_power("button");
+        mouse_clear(mb_left);
+    }
 }
 
 // count_jumpscare() hook: true = do not count this death (partner still alive -> I become a spectator)
@@ -140,6 +179,8 @@ function coop_spec_step()
     if (_pdead) { if (_s.partnerDeadSince < 0) { _s.partnerDeadSince = current_time; } else if (current_time - _s.partnerDeadSince > 500) { coop_spec_lose("partner died too"); return; } }
     else { _s.partnerDeadSince = -1; }
     if (keyboard_check_pressed(ord("P"))) { coop_send_ping(); }
+    if (keyboard_check_pressed(ord("G")) && coop_help_key_free(ord("G"))) { coop_spec_give_power("key G"); }
+    coop_spec_give_click();
     if (_c.bot && !_s.specShot && _s.framesIn > 3 && current_time - _s.specSince > 6000) { _s.specShot = true; coop_send_ping(); coop_log("SHOT spectator"); }
     if (current_time - _s.fpsT >= 2000) { _s.rfps = _s.fpsN * 1000 / max(1, current_time - _s.fpsT); _s.fpsN = 0; _s.fpsT = current_time; }
 }
@@ -163,7 +204,9 @@ function coop_stream_tick()
         else if (_s.lat >= 0 && _s.lat < 150 && _inflight < 16 && _s.kbps < _s.budget * 0.5 && _s.level > 0) { _s.level--; _s.st.levelUp++; }
         if (_old != _s.level) { coop_log("stream: level " + string(_old) + " -> " + string(_s.level) + " (" + string(_lv[_s.level][0]) + "x" + string(_lv[_s.level][1]) + " every " + string(_lv[_s.level][2]) + "ms; ack lat " + string(round(_s.lat)) + "ms, " + string_format(_s.kbps, 1, 1) + " KB/s, inflight " + string(_inflight) + ")"); }
     }
-    if (_inflight >= 32) { if (current_time - _s.lastSend > 4000) { _s.ackSeq = _s.seq; coop_log("stream: acks stalled 4s, resync"); } return; }
+    // Keep at most two video frames queued on the shared TCP socket so control packets
+    // are not stuck behind a backlog of spectator frames.
+    if (_inflight >= 2) { if (current_time - _s.lastSend > 4000) { _s.ackSeq = _s.seq; coop_log("stream: acks stalled 4s, resync"); } return; }
     if (current_time - _s.lastSend < _lv[_s.level][2]) { return; }
     var _w = _lv[_s.level][0], _h = _lv[_s.level][1];
     var _src = surface_exists(global.UISurface) ? global.UISurface : application_surface;
@@ -253,6 +296,14 @@ function coop_spec_draw()
     draw_text(140, 1, string(_hr) + " AM   power " + string(floor(max(_pw, 0))) + "%   doors " + (coop_partner_get("d0", 0) ? "L" : "-") + (coop_partner_get("d1", 0) ? "R" : "-") + "   " + _view);
     draw_set_color(c_ltgray);
     var _age = current_time - _s.lastFrameAt;
+    var _gr = coop_spec_give_button_rect(), _gkey = coop_spec_round_key();
+    var _gUsed = _s.specGiveUsedKey == _gkey, _gReady = coop_partner_alive_in_office() && !_gUsed && !_s.specGivePending;
+    var _gHover = point_in_rectangle(device_mouse_x_to_gui(0), device_mouse_y_to_gui(0), _gr[0], _gr[1], _gr[2], _gr[3]);
+    draw_set_alpha(_gReady ? (_gHover ? 0.9 : 0.72) : 0.55); draw_set_color(_gReady ? (_gHover ? c_teal : c_black) : c_dkgray);
+    draw_rectangle(_gr[0], _gr[1], _gr[2], _gr[3], false); draw_set_alpha(1);
+    draw_set_color(_gReady ? c_white : c_gray); draw_set_halign(fa_center);
+    draw_text((_gr[0] + _gr[2]) / 2, _gr[1] + 3, _gUsed ? "POWER USED" : (_s.specGivePending ? "SENDING..." : (_gReady ? "G  +10% POWER" : "WAIT FOR PARTNER")));
+    draw_set_halign(fa_left);
     draw_set_alpha(0.72); draw_set_color(c_black); draw_rectangle(0, _gh - 32, _gw, _gh, false); draw_set_alpha(1);
     draw_set_color(c_ltgray);
     draw_text(4, _gh - 29, "P: ping    M: mark partner's camera");
@@ -340,6 +391,35 @@ function coop_help_packet(_t, _m)
     switch (_t)
     {
         case "fack": coop_stream_on_ack(_m.s); return true;
+        case "specgive":
+            var _nightKey = string(_m.night), _got = 0;
+            if (room == Office && coop_alive() && _nightKey != "" && _s.specGiveRecvKey != _nightKey)
+            {
+                var _oldSpecPower = global.Power;
+                global.Power = min(global.Power + 10, max(coop_help_power_max(), global.Power));
+                _got = round(global.Power - _oldSpecPower);
+                if (_got > 0)
+                {
+                    _s.specGiveRecvKey = _nightKey; global.CoopF.sc.give += _got;
+                    coop_alert("Spectator sent you +" + string(_got) + "% power", c_lime, sfxBitCollect);
+                    coop_log("help: spectator power " + string(_oldSpecPower) + " -> " + string(global.Power));
+                    coop_send(coop_snapshot()); global.Coop.lastSnapSend = current_time;
+                }
+            }
+            coop_send({ t: "specgiveack", night: _nightKey, got: _got });
+            return true;
+        case "specgiveack":
+            if (_s.specGivePending && string(_m.night) == _s.specGiveRequestKey)
+            {
+                _s.specGivePending = false;
+                if (_m.got > 0)
+                {
+                    _s.specGiveUsedKey = string(_m.night); _s.st.give++;
+                    coop_alert("Sent +" + string(_m.got) + "% power to partner", c_lime, sfxBitCollect);
+                }
+                else { coop_alert("Power was not needed or could not be delivered", c_gray, undefined); }
+            }
+            return true;
         case "give":
             _s.st.giveIn++;
             if (room != Office || !coop_alive()) { coop_send({ t: "helpack", what: "give", ok: 0, amt: _m.amt }); return true; }
@@ -394,14 +474,13 @@ function coop_help_step()
     if (!_c.connected || !coop_alive()) { return; }
     if (variable_global_exists("DevMode") && global.DevMode) { return; }
     if (keyboard_check_pressed(ord("G")) && coop_help_key_free(ord("G"))) { coop_help_do("give", "key G"); }
-    if (keyboard_check_pressed(ord("H")) && coop_help_key_free(ord("H"))) { coop_help_do("warn", "key H"); }
     if (keyboard_check_pressed(ord("L")) && coop_help_key_free(ord("L"))) { coop_help_do("lure", "key L"); }
     // bot: fire each help action in turn
     if (_s.botHelp >= 0 && global.Timer >= _s.botHelp && _s.botHelpStep < 4 && current_time - _s.botHelpAt > 16000 && coop_partner_alive_in_office())
     {
         _s.botHelpAt = current_time;
         if (!_s.btnShot && _s.botHelpStep == 1) { _s.btnShot = true; coop_log("SHOT help_buttons"); return; } // 0.6.2: give first, while the partner still has full power
-        var _acts = ["give", "warn", "lure", "warn"];
+        var _acts = ["give", "lure", "give", "lure"];
         coop_log("bot: help " + _acts[_s.botHelpStep]);
         coop_help_do(_acts[_s.botHelpStep], "bot");
         _s.botHelpStep++;
@@ -411,10 +490,10 @@ function coop_help_step()
 // button rects under the mini-window (only in compact mode): [x1, y1, x2, y2, action, label]
 function coop_help_buttons(_px, _py, _w)
 {
-    var _bw = (_w - 2 * 2) / 3, _y1 = _py + 31, _y2 = _py + 46;
+    var _bw = (_w - 2) / 2, _y1 = _py + 31, _y2 = _py + 46;
     var _r = [];
-    var _def = [["give", "G+pw"], ["warn", "H !"], ["lure", "L lure"]];
-    for (var i = 0; i < 3; i++) { var _x1 = _px + i * (_bw + 2); array_push(_r, [_x1, _y1, _x1 + _bw, _y2, _def[i][0], _def[i][1]]); }
+    var _def = [["give", "G+pw"], ["lure", "L lure"]];
+    for (var i = 0; i < 2; i++) { var _x1 = _px + i * (_bw + 2); array_push(_r, [_x1, _y1, _x1 + _bw, _y2, _def[i][0], _def[i][1]]); }
     return _r;
 }
 

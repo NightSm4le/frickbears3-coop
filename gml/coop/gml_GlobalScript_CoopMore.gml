@@ -123,6 +123,7 @@ function coop_set_options()
 
 function coop_set_desc()
 {
+    var _g = global.CoopCfg;
     var _s = "Co-op settings. Host decides for both;\nyour mask and developer mode are local.";
     if (_g.devMode) { _s += "\nDeveloper mode shows spectator stream diagnostics."; }
     if (coop_is_client()) { _s += "\nConnected: values come from the host."; }
@@ -818,29 +819,30 @@ function coop_more_draw()
 {
     coop_econ_draw();
     var _c = global.Coop, _M = global.CoopM, _B = global.CoopB;
-    var _gw = display_get_gui_width();
-    if (room == Office && _c.connected && instance_exists(oSalvage) && global.CoopCfg.bossShared)
+    var _gw = display_get_gui_width(), _salvage = instance_find(oSalvage, 0), _scraptrap = instance_find(oScraptrap, 0);
+    if (room == Office && _c.connected && _salvage != noone && global.CoopCfg.bossShared)
     {
         draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw / 2 - 70, 48, _gw / 2 + 70, 62, false); draw_set_alpha(1);
-        draw_set_color(c_red); draw_set_halign(fa_center); draw_text(_gw / 2, 49, "SHARED BOSS HP " + string(max(0, round(oSalvage.HP))) + "%  P" + string(oSalvage.Phase) + (_B.aggro > 0 ? "  RAGE " + string(_B.aggro) : "")); draw_set_halign(fa_left);
+        draw_set_color(c_red); draw_set_halign(fa_center); draw_text(_gw / 2, 49, "SHARED BOSS HP " + string(max(0, round(_salvage.HP))) + "%  P" + string(_salvage.Phase) + (_B.aggro > 0 ? "  RAGE " + string(_B.aggro) : "")); draw_set_halign(fa_left);
     }
-    if (room == Office && _c.connected && instance_exists(oScraptrap))
+    if (room == Office && _c.connected && _scraptrap != noone)
     {
-        var _ty = (instance_exists(oSalvage) && global.CoopCfg.bossShared) ? 64 : 48; // 0.6.3: below the cam strip (3..28) and the alert banner (31..46)
+        var _ty = (_salvage != noone && global.CoopCfg.bossShared) ? 64 : 48; // below the cam strip and alert banner
         // 0.6.4 (S3-4): with the cams up, centre it over the camera view (right of the cam map and clear of its corner marks)
         var _tx = (variable_global_exists("CamUp") && global.CamUp) ? round(_gw * 0.6875) : _gw / 2;
-        var _tt = "SHARED TASKS LEFT: " + string(array_length(oScraptrap.Tasks)) + " (partner did " + string(_B.scrapIn) + ")", _tw = string_width(_tt) / 2 + 4;
+        var _tt = "SCRAPTRAP: " + string(array_length(_scraptrap.Tasks)) + " tasks left | partner finished " + string(_B.scrapIn), _tw = string_width(_tt) / 2 + 4;
         draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_tx - _tw, _ty, _tx + _tw, _ty + 14, false); draw_set_alpha(1);
         draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_tx, _ty + 1, _tt); draw_set_halign(fa_left);
     }
-    if (coop_is_maze_room(room) && _c.connected)
+    var _mazeCam = instance_find(oCamera3DMaze, 0);
+    if (coop_is_maze_room(room) && _c.connected && _mazeCam != noone)
     {
         draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(4, 24, 190, 42, false); draw_set_alpha(1);
         coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 6, 25, 1);
         draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
         if (_M.ghost && !_M.ghostDone) { draw_set_color(c_red); draw_text(6, 46, "CAUGHT - you are a ghost until your partner leaves the maze"); }
         draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
-        draw_text(26, 26, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(oCamera3DMaze.x, oCamera3DMaze.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
+        draw_text(26, 26, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(_mazeCam.x, _mazeCam.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
         draw_set_color(c_white);
     }
     if (room == SalvageResults && _M.waitShown)
