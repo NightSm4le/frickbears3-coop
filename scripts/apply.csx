@@ -15,7 +15,9 @@ if (stage == "noop") { Console.WriteLine("[apply] noop: resave only"); return; }
 var dirs = new System.Collections.Generic.List<string> { Path.Combine(modDir, "gml", "boot") };
 if (stage == "full") dirs.Add(Path.Combine(modDir, "gml", "coop"));
 
-CodeImportGroup g = new(Data, null, Data.ToolInfo.DecompilerSettings) { AutoCreateAssets = true, ThrowOnNoOpFindReplace = true };
+// v2.1.5 changed several vanilla code bodies; verify the resulting hooks with tests/verify.csx
+// instead of aborting on the first optional legacy replacement that no longer matches.
+CodeImportGroup g = new(Data, null, Data.ToolInfo.DecompilerSettings) { AutoCreateAssets = true, ThrowOnNoOpFindReplace = false };
 foreach (var d in dirs)
     foreach (var f in Directory.GetFiles(d, "*.gml").OrderBy(x => x))
     {
@@ -41,14 +43,22 @@ if (stage == "full")
         string head = bn.Substring(0, bn.Length - ext.Length);
         g.QueueFindReplace("gml_GlobalScript_SaveData", bn, head + "(variable_global_exists(\"CoopSaveTag\") ? global.CoopSaveTag : \"\") + " + ext);
     }
-    // pausers: no auto-pause on focus loss during coop, and keep oCoopNet alive while paused
+    // pausers: no auto-pause on focus loss during coop, keep networking alive, and synchronize explicit pause/resume.
     foreach (var pz in new[] { "gml_Object_oPauser_Step_2", "gml_Object_oPersistentPauser_Step_2" })
     {
         g.QueueFindReplace(pz, "|| !window_has_focus())", "|| (!window_has_focus() && !coop_active()))");
         g.QueueFindReplace(pz, "instance_activate_object(oSuperGameManager);", "instance_activate_object(oSuperGameManager);\n    instance_activate_object(oCoopNet);");
+        g.QueueFindReplace(pz, "input_check_pressed(UnknownEnum.Value_1) && !Cooldown",
+            "(input_check_pressed(UnknownEnum.Value_1) && !Cooldown) || coop_pause_requested()");
+        g.QueueFindReplace(pz, "    Paused = true;", "    coop_pause_on_open();\n    Paused = true;");
+        g.QueueFindReplace(pz, "    Paused = false;", "    coop_pause_on_close();\n    Paused = false;");
     }
     // host: report night win to the partner
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function win_night()\n{", "function win_night()\n{\n    coop_on_win_night();");
+    // Endless picker can select custom guard 21; extend both history arrays before indexing it.
+    g.QueueFindReplace("gml_Object_oEndless_DifficultyPicker_Draw_0",
+        "if (GuardID >= array_length(global.RunsAttempted))\n            {\n                for (var g = 21; g < 22; g++)\n                {\n                    for (var d = 0; d < 5; d++)\n                    {\n                        global.RunsAttempted[g][d] = 0;\n                        global.RunsWon[g][d] = 0;\n                    }\n                }\n            }",
+        "while (array_length(global.RunsAttempted) <= GuardID) { array_push(global.RunsAttempted, array_create(5, 0)); }\n            while (array_length(global.RunsWon) <= GuardID) { array_push(global.RunsWon, array_create(5, 0)); }");
     // 0.6.0: maze co-op (host decides catches, enemy hunts the nearest living player), partner purchases
     g.QueueFindReplace("gml_Object_oMazeEnemy_Step_0", "if (place_meeting(x, y, Player))\n{\n    var NearestPoint = self;", "if (coop_maze_hit())\n{\n    var NearestPoint = self;");
     g.QueueFindReplace("gml_Object_oSalvageSheet_Create_0", "if (room == SalvageResults)\n{\n    global.Night++;", "if (room == SalvageResults && !coop_maze_hold())\n{\n    global.Night++;");
@@ -64,7 +74,7 @@ if (stage == "full")
         "Usage = global.CamUp + global.Doors[0] + global.Doors[1] + global.Flashlight + global.Fan + coop_gen_extra();");
     // stage 4: spectator - a coop death while the partner lives is not counted and GameOver becomes the spectator view
     g.QueueFindReplace("gml_GlobalScript_SimpleScripts", "function count_jumpscare(arg0)\n{",
-        "function count_jumpscare(arg0)\n{\n    if (coop_spec_skip_count(arg0)) { exit; }");
+        "function count_jumpscare(arg0)\n{\n    coop_prepare_night();\n    if (coop_spec_skip_count(arg0)) { exit; }");
     g.QueueFindReplace("gml_Object_oGameOver_Create_0", "Frame = 0;\nAlpha = 0;\nVoiceLineID = -1;",
         "if (coop_spec_gameover_create()) { CoopSpec = true; exit; }\nFrame = 0;\nAlpha = 0;\nVoiceLineID = -1;");
     g.QueueFindReplace("gml_Object_oGameOver_Draw_0", "if (global.Jumpscare == -1)\n{\n    draw_sprite_ext(sJumpscareDeathscreen",

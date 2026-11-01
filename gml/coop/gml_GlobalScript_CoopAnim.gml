@@ -9,6 +9,7 @@ global.CoopA = {
     scanAt: -100000,
     tok: array_create(201, 0),      // host arbitration table: 0 free, 1 host, 2 client
     tokAt: array_create(201, 0),
+    granted: array_create(201, false),
     threat: array_create(201, false),
     pendAt: array_create(201, 0),   // client: claim sent at
     boostAmt: array_create(201, 0),
@@ -77,7 +78,7 @@ function coop_anim_night_start()
 {
     var _a = global.CoopA;
     if (_a.objOf[1] == -1) { coop_anim_build(); }
-    for (var i = 0; i < 201; i++) { _a.tok[i] = 0; _a.threat[i] = false; _a.boostAmt[i] = 0; _a.aggro[i] = 0; _a.pendAt[i] = 0; }
+    for (var i = 0; i < 201; i++) { _a.tok[i] = 0; _a.granted[i] = false; _a.threat[i] = false; _a.boostAmt[i] = 0; _a.aggro[i] = 0; _a.pendAt[i] = 0; }
     _a.doorSince = -1; _a.myDc = 0; _a.genExtra = 0; _a.lastKiller = -1; _a.diedSent = false;
     _a.lureX = variable_global_exists("AudioLureX") ? global.AudioLureX : -99;
     _a.lureY = variable_global_exists("AudioLureY") ? global.AudioLureY : -99;
@@ -243,20 +244,33 @@ function coop_anim_step()
                 }
                 else if (coop_is_host())
                 {
-                    _a.tok[_id] = 1; _a.tokAt[_id] = current_time;
-                    coop_log("token: host takes " + coop_anim_name(_id));
+                    if (_a.tok[_id] == 2)
+                    {
+                        _a.st.localDenies++;
+                        coop_anim_retreat(_id, "attack token is reserved for partner");
+                        _t = false;
+                    }
+                    else
+                    {
+                        _a.tok[_id] = 1; _a.tokAt[_id] = current_time;
+                        coop_log("token: host takes " + coop_anim_name(_id));
+                    }
+                }
+                else if (_a.granted[_id])
+                {
+                    coop_log("token: client is using host grant for " + coop_anim_name(_id));
                 }
                 else
                 {
                     _a.st.claims++; _a.pendAt[_id] = current_time;
-                    coop_send({ t: "claim", id: _id });
+                    coop_send({ t: "claim", id: _id, name: coop_anim_name(_id) });
                     coop_log("token: claim " + coop_anim_name(_id));
                 }
             }
             else if (!_t && _a.threat[_id])
             {
                 if (coop_is_host()) { if (_a.tok[_id] == 1) { _a.tok[_id] = 0; } }
-                else { coop_send({ t: "release", id: _id }); }
+                else { coop_send({ t: "release", id: _id }); _a.granted[_id] = false; }
                 coop_log("token: release " + coop_anim_name(_id));
             }
             if (_t && coop_is_host()) { _a.tok[_id] = 1; _a.tokAt[_id] = current_time; }
@@ -278,7 +292,7 @@ function coop_anim_step()
     if (!_alive && !_a.diedSent && _c.connected)
     {
         _a.diedSent = true; _a.st.diedOut++;
-        coop_send({ t: "died", id: _a.lastKiller });
+        coop_send({ t: "died", id: _a.lastKiller, name: coop_anim_name(_a.lastKiller) });
         coop_log("died: killed by " + coop_anim_name(_a.lastKiller));
     }
     // generator: doors closed for a long time load the SHARED generator
@@ -305,7 +319,7 @@ function coop_anim_night_end()
     {
         var _d = _a.boostAmt[i] + _a.aggro[i];
         if (_d > 0 && variable_global_exists("AILevels")) { global.AILevels[i] = max(0, global.AILevels[i] - _d); }
-        _a.boostAmt[i] = 0; _a.aggro[i] = 0; _a.tok[i] = 0; _a.threat[i] = false;
+        _a.boostAmt[i] = 0; _a.aggro[i] = 0; _a.tok[i] = 0; _a.granted[i] = false; _a.threat[i] = false;
     }
     coop_log("anim stats: " + json_stringify(_a.st));
 }
@@ -338,7 +352,29 @@ function coop_jumpscare_gate(_id)
         coop_anim_retreat(_id, "revive invulnerability");
         return true;
     }
+    if (coop_is_client())
+    {
+        if (_a.granted[_id]) { _a.lastKiller = _id; _a.st.jumpscares++; return false; }
+        if (_a.pendAt[_id] <= 0)
+        {
+            _a.pendAt[_id] = current_time;
+            _a.st.claims++;
+            coop_send({ t: "claim", id: _id, name: coop_anim_name(_id) });
+            coop_log("token: emergency claim at jumpscare gate for " + coop_anim_name(_id));
+        }
+        coop_log("GATE: jumpscare by " + coop_anim_name(_id) + " cancelled until host grants token");
+        coop_anim_retreat(_id, "waiting for attack token");
+        return true;
+    }
     _a.st.jumpscares++;
+    if (_a.tok[_id] == 2 && current_time - _a.tokAt[_id] < 3000)
+    {
+        _a.st.gateBlocks++;
+        coop_log("GATE: jumpscare by " + coop_anim_name(_id) + " cancelled - host reserved token for partner");
+        coop_anim_retreat(_id, "jumpscare gate");
+        return true;
+    }
+    _a.tok[_id] = 1; _a.tokAt[_id] = current_time;
     if (coop_partner_holds(_id))
     {
         _a.st.gateBlocks++;
@@ -381,21 +417,33 @@ function coop_anim_packet(_t, _m)
 {
     var _c = global.Coop, _a = global.CoopA;
     var _id = variable_struct_exists(_m, "id") ? _m.id : -1;
+    var _name = variable_struct_exists(_m, "name") ? string(_m.name) : coop_anim_name(_id);
+    if (!is_numeric(_id) || _id < 0 || _id > 200) { _id = -1; }
+    if (_id < 0 && (_t == "claim" || _t == "release" || _t == "grant" || _t == "deny")) { coop_log("token: ignored invalid " + _t + " packet"); return true; }
     switch (_t)
     {
         case "claim": // host
-            if (_a.tok[_id] == 1 && _a.threat[_id]) { _a.st.denies++; coop_send({ t: "deny", id: _id }); coop_log("token: DENY client " + coop_anim_name(_id) + " (host holds)"); }
-            else { _a.st.grants++; _a.tok[_id] = 2; _a.tokAt[_id] = current_time; coop_send({ t: "grant", id: _id }); coop_log("token: GRANT client " + coop_anim_name(_id)); }
+            if (_id < 0) { coop_log("token: rejected invalid client claim id " + string(_m.id)); return true; }
+            if (_a.tok[_id] == 1) { _a.st.denies++; coop_send({ t: "deny", id: _id }); coop_log("token: DENY client " + _name + " (host has the reservation)"); }
+            else
+            {
+                _a.st.grants++; _a.tok[_id] = 2; _a.tokAt[_id] = current_time;
+                var _local = coop_anim_inst(_id);
+                if (_local != noone && coop_anim_threat(_id)) { coop_anim_retreat(_id, "attack token granted to partner"); }
+                coop_send({ t: "grant", id: _id }); coop_log("token: GRANT client " + _name);
+            }
             return true;
         case "release": // host
             if (_a.tok[_id] == 2) { _a.tok[_id] = 0; coop_log("token: client released " + coop_anim_name(_id)); }
             return true;
         case "grant": // client
             _a.pendAt[_id] = 0;
+            _a.granted[_id] = true;
             coop_log("token: granted " + coop_anim_name(_id));
             return true;
         case "deny": // client
             _a.pendAt[_id] = 0;
+            _a.granted[_id] = false;
             coop_log("token: denied " + coop_anim_name(_id));
             if (room == Office && _a.threat[_id]) { coop_anim_retreat(_id, "host denied token"); }
             return true;
@@ -447,14 +495,14 @@ function coop_anim_packet(_t, _m)
             else { coop_log("my lure had no effect at partner"); }
             return true;
         case "died":
-            coop_log("partner died, killer " + coop_anim_name(_id));
+            coop_log("partner died, killer " + _name);
             if (room == Office && coop_alive() && _id >= 0 && coop_anim_inst(_id) != noone)
             {
                 var _add = clamp(20 - global.AILevels[_id], 0, 5);
                 _a.aggro[_id] += _add; global.AILevels[_id] += _add; _a.st.aggro++;
-                coop_alert("Partner killed by " + coop_anim_name(_id) + "! It is hungrier (AI " + string(global.AILevels[_id]) + ")", c_red, sfxError);
+                coop_alert("Partner killed by " + _name + "! It is hungrier (AI " + string(global.AILevels[_id]) + ")", c_red, sfxError);
             }
-            else if (room == Office && coop_alive()) { coop_alert("Partner died (" + coop_anim_name(_id) + ")", c_red, sfxError); }
+            else if (room == Office && coop_alive()) { coop_alert("Partner died (" + _name + ")", c_red, sfxError); }
             return true;
     }
     return false;

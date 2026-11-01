@@ -124,6 +124,9 @@ function coop_sync_packet(_t, _m)
             _m.at = current_time;
             array_push(_S.tbPend, _m);
             return true;
+        case "tbreq":
+            coop_tb_request(_m);
+            return true;
         case "nskip":
             if (room == NightOpening && instance_exists(oNightOpening)) { with (oNightOpening) { Frame = max(Frame, 301); } coop_log("SYNC: partner skipped the night card -> skip"); }
             return true;
@@ -268,7 +271,7 @@ function coop_tb_forward_inst(_i)
         if (TextDrawChar != TextLength[TextPage]) { TextDrawChar = TextLength[TextPage]; return "reveal"; }
         if (TextPage < (TextPageNumber - 1))
         {
-            if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; audio_play_sound(sfxCamSwitch, 5, false); initialize(); game_text(_dst); }
+            if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; audio_play_sound(sfxCamSwitch, 5, false); initialize(); var _boundGameText = method(id, game_text); _boundGameText(_dst); }
             TextPage += 1; TextDrawChar = 0;
             if (is_callable(Function[TextPage])) { Function[TextPage](); }
             if (array_length(CGPFunction) > 0 && TextPage < array_length(CGPFunction))
@@ -301,9 +304,27 @@ function coop_tb_send_press(_i)
 {
     var _S = global.CoopSync;
     var _act = (_i.TextDrawChar != _i.TextLength[_i.TextPage]) ? "reveal" : "adv";
-    coop_send({ t: "tb", k: coop_tb_key(_i), act: _act, opt: _i.TextOptionPosition, o: object_get_name(_i.object_index) });
+    var _type = coop_is_client() ? "tbreq" : "tb";
+    coop_send({ t: _type, k: coop_tb_key(_i), act: _act, opt: _i.TextOptionPosition, o: object_get_name(_i.object_index) });
     _S.tbOut++;
-    coop_log("SYNC tb out: " + _act + " [" + coop_tb_key(_i) + "]");
+    coop_log("SYNC tb out: " + _type + " " + _act + " [" + coop_tb_key(_i) + "]");
+}
+
+function coop_tb_request(_m)
+{
+    if (!coop_is_host()) { return; }
+    var _l = coop_tb_list(), _key = string(_m.k);
+    for (var k = 0; k < array_length(_l); k++)
+    {
+        var _i = _l[k];
+        if (!instance_exists(_i) || coop_tb_key(_i) != _key || !coop_tb_can(_i)) { continue; }
+        _i.TextOptionPosition = _m.opt;
+        var _act = coop_tb_forward_inst(_i);
+        coop_send({ t: "tb", k: _key, act: _act, opt: _m.opt, o: _m.o });
+        coop_log("SYNC tb request: client " + string(_m.act) + " -> host " + _act + " [" + _key + "]");
+        return;
+    }
+    coop_log("SYNC tb request: ignored; host is not on [" + _key + "]");
 }
 
 function coop_tb_step()
@@ -314,7 +335,15 @@ function coop_tb_step()
     // local key press (the textbox reads the same key in its Draw, after this Step)
     if (array_length(_l) > 0 && input_check_pressed(0))
     {
-        for (var k = 0; k < array_length(_l); k++) { if (coop_tb_can(_l[k])) { coop_tb_send_press(_l[k]); break; } }
+        for (var k = 0; k < array_length(_l); k++)
+        {
+            if (coop_tb_can(_l[k]))
+            {
+                coop_tb_send_press(_l[k]);
+                if (coop_is_client()) { input_clear(0); }
+                break;
+            }
+        }
     }
     // FLAGGED bot: "press" the key - send exactly like a real press, then do what the textbox does with it
     if (_S.botPress >= 0 && array_length(_l) > 0 && _S.botPressN < _S.botPressMax && current_time - _S.botPressAt > max(250, _S.botPress))

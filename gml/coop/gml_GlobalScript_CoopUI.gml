@@ -61,6 +61,21 @@ function coop_partner_state_text()
     return ["", c_white];
 }
 
+function coop_draw_scene_participants()
+{
+    if (!global.Coop.connected || room == Office || (!instance_exists(oTextBox) && !instance_exists(oTextBox_Fredbear))) { return; }
+    var _gw = display_get_gui_width(), _me = coop_my_slot(), _other = coop_partner_slot();
+    var _ownSpr = coop_art_get(_me, global.CoopCfg.mask, "portrait");
+    var _partnerSpr = coop_art_get(_other, global.CoopCfg.partnerMask, "portrait");
+    var _sz = 32, _y = 24;
+    draw_set_alpha(0.75); draw_set_color(c_black); draw_rectangle(3, _y - 2, 39, _y + 48, false); draw_rectangle(_gw - 39, _y - 2, _gw - 3, _y + 48, false);
+    draw_set_alpha(1);
+    draw_set_color(c_white); draw_set_halign(fa_center); draw_text(21, _y - 1, "P" + string(_me)); draw_text(_gw - 21, _y - 1, "P" + string(_other));
+    if (_ownSpr >= 0) { draw_sprite_ext(_ownSpr, 0, 5, _y + 12, _sz / sprite_get_width(_ownSpr), _sz / sprite_get_height(_ownSpr), 0, c_white, 1); }
+    if (_partnerSpr >= 0) { draw_sprite_ext(_partnerSpr, 0, _gw - 37, _y + 12, _sz / sprite_get_width(_partnerSpr), _sz / sprite_get_height(_partnerSpr), 0, c_white, 1); }
+    draw_set_halign(fa_left); draw_set_color(c_white);
+}
+
 function coop_draw_overlay()
 {
     var _c = global.Coop, _a = global.CoopA, _u = global.CoopUI;
@@ -99,7 +114,7 @@ function coop_draw_overlay()
         else if (_strip)
         {
             // 0.6.3: all text on row 1 (nothing clipped at the strip's bottom edge), row 2 = doors + power bar only
-            var _sv = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "OFFICE";
+            var _sv = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "SEATED";
             if (coop_partner_get("mk", 0)) { _sv = "MASK"; }
             if (coop_partner_get("pu", 0)) { _sv = "PANEL"; }
             if (coop_partner_get("fan", 0)) { _sv += "+FAN"; }
@@ -123,7 +138,7 @@ function coop_draw_overlay()
             draw_set_color(_pw > 25 ? c_lime : c_red); draw_rectangle(_px + 56, _py + 5, _px + 56 + (_w - 60) * clamp(_pw, 0, 100) / 100, _py + 10, false);
             draw_set_color(coop_partner_get("d0", 0) ? c_red : c_dkgray); draw_rectangle(_px + 4, _py + 18, _px + 11, _py + 25, false);
             draw_set_color(coop_partner_get("d1", 0) ? c_red : c_dkgray); draw_rectangle(_px + 14, _py + 18, _px + 21, _py + 25, false);
-            var _view = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "OFFICE";
+            var _view = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "SEATED";
             if (coop_partner_get("mk", 0)) { _view = "MASK"; }
             if (coop_partner_get("pu", 0)) { _view = "PANEL"; }
             if (coop_partner_get("fan", 0)) { _view += " FAN"; }
@@ -151,7 +166,7 @@ function coop_draw_overlay()
     // key hint for the first seconds of a night
     if (current_time < global.CoopS.hintUntil && coop_alive() && !(variable_struct_exists(global.CoopUI, "strip") && global.CoopUI.strip)) // 0.6.2: not over the cam map tabs
     {
-        var _ht = "CO-OP: P ping G give H warn L lure M mark V revive Tab hide F9 move";
+        var _ht = "CO-OP: P ping G power L lure M mark V revive Tab hide F9 move";
         var _hw = string_width(_ht) + 10;
         draw_set_alpha(0.5); draw_set_color(c_black); draw_rectangle(_gw / 2 - _hw / 2, _gh - 64, _gw / 2 + _hw / 2, _gh - 50, false);
         draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh - 63, _ht); draw_set_halign(fa_left); draw_set_alpha(1);

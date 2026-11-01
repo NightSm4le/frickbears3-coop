@@ -3,8 +3,8 @@
 // Works through Porthole / any single-port TCP tunnel: client connects to 127.0.0.1:<port>.
 
 global.Coop = {
-    proto: 6,
-    modver: "0.6.4",
+    proto: 7,
+    modver: "0.6.6",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -60,6 +60,53 @@ global.Coop = {
     botShotAt: 0,
     botDie: -1
 };
+
+global.CoopPause = { remotePending: false, remoteOpening: false, remotePaused: false, remoteResume: false, localPaused: false };
+
+function coop_pause_requested()
+{
+    var _p = global.CoopPause;
+    if (!_p.remotePending) { return false; }
+    _p.remotePending = false;
+    _p.remoteOpening = true;
+    return true;
+}
+
+function coop_pause_on_open()
+{
+    var _p = global.CoopPause, _c = global.Coop;
+    if (_p.remoteOpening) { _p.remoteOpening = false; _p.remotePaused = true; coop_log("PAUSE: partner paused both games"); return; }
+    if (_c.connected) { _p.localPaused = true; coop_send({ t: "pause", paused: 1 }); coop_log("PAUSE: requested for both games"); }
+}
+
+function coop_pause_on_close()
+{
+    var _p = global.CoopPause, _c = global.Coop;
+    if (_p.remoteResume) { _p.remoteResume = false; _p.remotePaused = false; return; }
+    if (_c.connected && (_p.localPaused || _p.remotePaused))
+    {
+        _p.localPaused = false; _p.remotePaused = false;
+        coop_send({ t: "pause", paused: 0 });
+        coop_log("PAUSE: resume sent to partner");
+    }
+}
+
+function coop_pause_packet(_m)
+{
+    var _p = global.CoopPause;
+    if (_m.paused)
+    {
+        _p.remotePending = true; _p.remotePaused = true;
+        coop_log("PAUSE: partner paused; opening local pause menu");
+    }
+    else
+    {
+        _p.remotePending = false; _p.remotePaused = false; _p.remoteResume = true;
+        if (instance_exists(oPauser)) { with (oPauser) { Unpause = true; } }
+        if (instance_exists(oPersistentPauser)) { with (oPersistentPauser) { Unpause = true; } }
+        coop_log("PAUSE: partner resumed; resuming local game");
+    }
+}
 
 function coop_log(_msg)
 {
@@ -303,6 +350,9 @@ function coop_on_packet(_m)
         case "pong":
             _c.rtt = current_time - variable_struct_get(_m, "ts");
             break;
+        case "pause":
+            coop_pause_packet(_m);
+            break;
         case "night": // client: follow host into the same night (host is the authority for the night number)
             if (!coop_is_client()) { break; }
             _c.hostNight = variable_struct_get(_m, "night");
@@ -471,6 +521,7 @@ function coop_draw_gui()
     coop_warn_draw();
     coop_feat_draw();
     coop_more_draw();
+    coop_draw_scene_participants();
     coop_sync_draw();
     coop_s3_draw();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
@@ -502,7 +553,20 @@ function coop_draw_gui()
 // at boot initialize_endless_data() leaves global.Deaths = 0 (a number), and count_jumpscare / NightClear then index it.
 function coop_prepare_night()
 {
-    if (!is_array(global.Deaths)) { global.Deaths = [0, 0, 0, 0, 0, 0]; coop_log("prepare night: global.Deaths was not an array -> [0,0,0,0,0,0]"); }
+    var _guard = variable_global_exists("Guard") && is_numeric(global.Guard) ? clamp(floor(global.Guard), 0, 200) : 5;
+    var _need = max(6, _guard + 1);
+    var _hasDeaths = variable_global_exists("Deaths");
+    if (!_hasDeaths || !is_array(global.Deaths))
+    {
+        var _carry = (_hasDeaths && is_numeric(global.Deaths)) ? global.Deaths : 0;
+        global.Deaths = array_create(_need, 0);
+        global.Deaths[_guard] = _carry;
+        coop_log("prepare night: initialized global.Deaths for guard " + string(_guard));
+    }
+    else
+    {
+        while (array_length(global.Deaths) < _need) { array_push(global.Deaths, 0); }
+    }
 }
 
 

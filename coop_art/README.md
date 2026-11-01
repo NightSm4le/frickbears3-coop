@@ -16,6 +16,18 @@ Repeat the names for `P1` and `P2` and for the mask slot the player chooses in C
 
 Use the supplied `P1_*` and `P2_*` PNGs in this folder as editable examples. Keep each billboard frame exactly 32x64 pixels. If a custom billboard is missing or has the wrong dimensions/frame count, the game logs a warning and falls back to its embedded art.
 
+## Import a custom guard add-on
+
+The included `scripts/import_addon_skin.py` converts a game's custom-guard folder into the three co-op PNGs. Run it from the game folder (Python and Pillow required):
+
+```powershell
+python path\to\frickbears3-coop\scripts\import_addon_skin.py addons\Grike --seat P2 --mask freddy
+```
+
+It reads the first panel of `selection.png` for the static maze character, and uses `portrait.png` and `icon.png` when present. The selection art is repeated across all six frames, so the resulting billboard is static; draw over those frames to animate it. Change the seat and mask arguments to match the player and selected mask. Both players need matching files.
+
+The Grike/SEAR archive uses this separate game add-on format. Its character-selection art can be imported as a static skin; the archive does not include directional walk frames, so animation requires editing the six-frame PNG.
+
 ## Install
 
 1. Make a folder named `coop_art` beside the game's executable.

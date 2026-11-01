@@ -153,3 +153,18 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
 - DONE in 0.5.0: marks, revive, joint door, night score, separate co-op saves. Still LATER: co-op settings screen, stage 7 (shared difficulty,
   per-player money/upgrades), shared boss HP implementation (plan above), Stage 6: 3D co-op in MinigameMaze_1. Mask sprites: drafts only
   (qa/sprites_masks_sheet.png, qa/sprites_masks_mock.png), final after user approval.
+
+## 0.6.5 — spectator assist, Endless history guard, and custom skin importer (2026-10-30)
+- Spectator can send +10% power once per story night / Endless round with G or the on-screen button; confirmation arrives from the survivor.
+- Removed the H warning action and its panel button/key hint.
+- Endless custom guard selection now extends RunsAttempted before indexing the custom guard's row.
+- `scripts/import_addon_skin.py` converts a game's static selection art to a six-frame co-op billboard and imports its portrait/icon;
+  animated skins can be edited in the documented 192x64 template format.
+
+## v2.1.5 migration work
+- `scripts/build.ps1` builds from a supplied clean `data.win` without replacing it, then runs `tests/verify.csx`.
+- Fixed missing co-op settings context, dialogue `game_text` instance binding, and initialization/extension of the Deaths array for custom guards.
+- Updated the v2.1.5 Endless picker history bounds fix for both `RunsAttempted` and `RunsWon`.
+- Animatronic kills on the client now wait for a host attack-token grant; spectator streaming starts at 640x360 and is capped at two unacknowledged frames to reduce TCP head-of-line delay.
+- Office HUD labels a partner who is not using the camera/panel as `SEATED`; this is a status indicator, not a new animated player model.
+- Static build verification passed on the supplied v2.1.5 `data.win`; an in-game two-player/network test has not been run. Addon import remains 2D PNG skin conversion, not 3D model loading.
