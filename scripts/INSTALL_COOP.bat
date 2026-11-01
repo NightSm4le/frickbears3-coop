@@ -69,5 +69,5 @@ if errorlevel 1 (
 echo.
 echo DONE. The co-op build is installed.
 echo Original backup: "%BACKUP%"
-echo Use the other build folder to install the other version.
+echo To undo: close the game and restore data.win.coop-backup as data.win.
 pause

@@ -8,8 +8,6 @@ On Windows, build from a clean v2.1.5 `data.win` with UndertaleModTool CLI:
 .\scripts\build.ps1 -BaseData "C:\path\to\clean\data.win" -UndertaleModCli "C:\path\to\UndertaleModCli.exe"
 ```
 
-An optional, separate local admin build is available with `-AdminCheats`. It writes to a different output file and uses an isolated save slot. It is not a secure account-based admin system; do not share that build.
+For a ready-to-run installer, download `INSTALL_COOP.bat` from the GitHub release. Put it and the locally built co-op file renamed to `data.win` together in a subfolder directly inside the game folder, then double-click the BAT. It backs up the original as `data.win.coop-backup` before replacing it. The game-containing `data.win` is not included in the public release.
 
-For a ready-to-run installer, put `scripts\install_build.bat` and the built file renamed to `data.win` together in an install folder directly inside the game folder, then double-click the BAT. It backs up the original as `data.win.coop-backup` before replacing it. Keep separate folders for the standard and admin builds.
-
-See [Руководство по коопу](Гайд_коопа/README_RU.md) for installation, custom character art, admin-build details, and the upgrade process for future game versions. See [custom co-op skin formats](coop_art/README.md) for PNG dimensions and the add-on importer.
+See [Итог изменений v0.7.2](ИТОГ_0.7.2_RU.md) for the full Russian changelog and key list. See [Руководство по коопу](Гайд_коопа/README_RU.md) for building, custom character art, and updating for future game versions. See [custom co-op skin formats](coop_art/README.md) for PNG dimensions and the add-on importer.
