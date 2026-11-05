@@ -347,6 +347,7 @@ function coop_boss_step()
 {
     var _B = global.CoopB, _c = global.Coop;
     if (!_c.connected || room != Office || !global.CoopCfg.bossShared) { _B.lastHP = -1; return; }
+    coop_boss_roles_step(); // 0.8.0 (215-boss): roles change damage / pushback (before the HP delta below)
     if (instance_exists(oSalvage))
     {
         var _hp = oSalvage.HP;
@@ -725,7 +726,7 @@ function coop_more_step()
             global.CoopF.revLeft = _g.revives;
             if (!_g.jd) { global.CoopF.jd.done = true; }
             global.CoopA.repelChance = _g.repel;
-            _B.aggro = 0; _B.pDeadSeen = false; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
+            _B.aggro = 0; _B.pDeadSeen = false; _B.meDeadSeen = false; global.CoopBR.dmgAdj = 0; global.CoopBR.solo = false; global.CoopBR.winN = 0; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
             _E.partnerEr = -1; _E.botBuyDone = false;
         }
         if (coop_is_maze_room(room)) { _M.mzRoom = room; _M.mzAt = current_time; _M.botSitOn = false; _M.botSitWait = false; _M.sitLog = -1; _M.sit = false; _M.psit = 0; _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
@@ -998,22 +999,4 @@ function coop_char_next(_cur, _partner)
     return "";
 }
 
-// ---------------- 0.7.4: boss roles (hint panel; P1 distracts, P2 hits) ----------------
-function coop_boss_roles_draw()
-{
-    if (!global.Coop.connected || !boss_fight_night() || !instance_exists(oSalvage)) { return; }
-    var _gw = display_get_gui_width(), _me = coop_my_slot();
-    var _dis = (_me == 1);
-    var _t1 = _dis ? "YOUR ROLE: DISTRACT" : "YOUR ROLE: HIT";
-    var _t2 = _dis ? "Keep Salvage looking at YOU - flash / lure, survive" : "Salvage is busy with P1 - attack now";
-    var _t3 = "Boss HP is SHARED  |  boss attacks each player on their own screen";
-    var _w = max(string_width(_t2), string_width(_t3)) + 16, _x = (_gw - _w) / 2;
-    var _ry = 84; // 0.7.5: below SHARED BOSS HP / ping / key hint
-    coop_ui_panel(_x, _ry, _x + _w, _ry + 48);
-    draw_set_halign(fa_center);
-    draw_set_color(_dis ? make_color_rgb(230, 120, 40) : make_color_rgb(120, 200, 90)); draw_text(_gw / 2, _ry + 2, _t1);
-    draw_set_color(c_white); draw_text(_gw / 2, _ry + 17, _t2);
-    draw_set_color(make_color_rgb(200, 196, 188)); draw_text(_gw / 2, _ry + 32, _t3);
-    var _hp = variable_instance_exists(oSalvage, "HP") ? oSalvage.HP : -1;
-    draw_set_halign(fa_left); draw_set_color(c_white);
-}
+// 0.7.4 boss roles panel moved to CoopBoss (0.8.0: real role mechanics)

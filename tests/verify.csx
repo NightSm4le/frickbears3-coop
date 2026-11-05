@@ -89,6 +89,17 @@ if (stage == "full")
     need(more.Contains("function coop_set_row_visible(") && more.Contains("hostDiff"), "S9-1/S9-2 settings helpers missing");
     need(more.Contains("function coop_maze_set_sit(") && more.Contains("coop_maze_set_sit(true, \"bot\")") && more.Contains("coop_maze_set_sit(false, \"bot\")"), "S10-1 bot sit must use the shared sit path");
     need(net.Contains("botImplied") && net.Contains("implied by "), "S11-1 -coop-bot* flags must imply bot mode");
+    // 0.8.0 (215-sync / 215-boss)
+    var story = D("gml_GlobalScript_CoopStory");
+    need(story.Contains("function coop_story_apply(") && story.Contains("function coop_story_merge_in(") && story.Contains("CCStory"), "215-sync host story mirror missing");
+    need(net.Contains("coop_story_packet("), "215-sync packets not dispatched");
+    need(net.Contains("story = coop_story_collect()"), "215-sync story not in the night payload");
+    need(net.Contains("coop_story_apply("), "215-sync night payload not applied");
+    need(net.Contains("coop_story_save_merge("), "215-sync save merge missing");
+    need(D("gml_Object_oCoopNet_Step_0").Contains("coop_story_step()"), "215-sync step hook missing");
+    var boss = D("gml_GlobalScript_CoopBoss");
+    need(boss.Contains("function coop_boss_roles_step(") && boss.Contains("MoveTimer") && boss.Contains("HPDrainRate") && boss.Contains("function coop_boss_roles_draw("), "215-boss role mechanics missing");
+    need(more.Contains("coop_boss_roles_step()") && net.Contains("_s.bf = coop_boss_flashing()"), "215-boss roles not wired");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");

@@ -64,6 +64,7 @@ coop_feat_step();
 coop_more_step();
 coop_sync_step();
 coop_s3_step();
+coop_story_step(); // 0.8.0 (215-sync)
 coop_ui_keys();
 coop_title_step();
 // --- ping (P) ---

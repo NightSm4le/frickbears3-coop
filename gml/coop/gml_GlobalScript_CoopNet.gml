@@ -3,8 +3,8 @@
 // Works through Porthole / any single-port TCP tunnel: client connects to 127.0.0.1:<port>.
 
 global.Coop = {
-    proto: 7,
-    modver: "0.7.9",
+    proto: 8,
+    modver: "0.8.0",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -262,7 +262,7 @@ function coop_active() { return variable_global_exists("Coop") && global.Coop.mo
 function coop_block_save(_what)
 {
     // 0.5.0: both sides write their OWN co-op save file (global.CoopSaveTag), the original is never touched
-    if (coop_active()) { coop_log("save -> co-op file (" + global.CoopSaveTag + "): " + _what); }
+    if (coop_active()) { coop_log("save -> co-op file (" + global.CoopSaveTag + "): " + _what); coop_story_save_merge(_what); }
     return false;
 }
 
@@ -367,6 +367,7 @@ function coop_night_payload()
         if (variable_global_exists("AllTimeSalvages")) { _m.salv = global.AllTimeSalvages; }
         if (variable_global_exists("BossPhase")) { _m.bossphase = global.BossPhase; }
     }
+    if (is_numeric(global.Night)) { _m.story = coop_story_collect(); } // 0.8.0 (215-sync): one story branch for both
     return _m;
 }
 
@@ -406,6 +407,7 @@ function coop_apply_night(_m)
         coop_log("ENDLESS: round " + string(global.EndlessRound) + " guard " + string(global.Guard) + " salvages " + string(array_length(global.AllTimeSalvages)) + " from host");
     }
     coop_log("ECON: difficulty " + string(global.Difficulty) + " from host (one difficulty for both)");
+    if (coop_is_client() && variable_struct_exists(_m, "story")) { coop_story_apply(_m.story, true, "night " + string(global.Night) + " start"); }
     coop_log("host started night " + string(global.Night));
 }
 
@@ -514,7 +516,7 @@ function coop_on_packet(_m)
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m) && !coop_s3_packet(_t, _m) && !coop_s4_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
+            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m) && !coop_s3_packet(_t, _m) && !coop_s4_packet(_t, _m) && !coop_story_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 
@@ -582,6 +584,7 @@ function coop_snapshot()
         _s.dc = floor(global.CoopA.myDc);
         if (variable_global_exists("PanelUp")) { _s.pu = global.PanelUp ? 1 : 0; }
         if (variable_global_exists("MonitorSystem")) { _s.ms = global.MonitorSystem; }
+        if (instance_exists(oSalvage)) { _s.bf = coop_boss_flashing() ? 1 : 0; } // 0.8.0: boss role window
     }
     return _s;
 }

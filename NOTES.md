@@ -173,3 +173,11 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
 - Animatronic kills on the client now wait for a host attack-token grant; spectator streaming starts at 640x360 and is capped at two unacknowledged frames to reduce TCP head-of-line delay.
 - Office HUD labels a partner who is not using the camera/panel as `SEATED`; this is a status indicator, not a new animated player model.
 - Static build verification passed on the supplied v2.1.5 `data.win`; an in-game two-player/network test has not been run. Addon import remains 2D PNG skin conversion, not 3D model loading.
+
+## 0.8.0
+- 215-sync: gml_GlobalScript_CoopStory — host-authoritative story mirror (packets story/stup/streq; story also inside the night payload).
+  Exact from host: Route, ShuffleMode/ShuffleData, Deaths, Guard (numeric nights), UnlockedAnimatronics[128..], masks/scraps/minigames, UnlockFlags (non-CCStory), ClearedEndings, ShuffleCallsHeard.
+  Client gains in the session go up (stup) and are union-merged on the host. Client keeps its own permanent unlocks at save_permanent_data (union, then host state re-applied).
+  Not synced: shop (RunEarnings/Upgrades/CCStory_*), maze-run state, maze/menu textbox paging. Only numeric nights.
+- 215-boss: gml_GlobalScript_CoopBoss — Salvage roles: P1 distract (pushback x1.6, dmg x0.6, slows P2's Salvage while flashing), P2 hit (dmg x1.3 / x1.7 in the window). SOLO when the partner is down; host death now enrages too. Snapshot field bf.
+- proto 8.
