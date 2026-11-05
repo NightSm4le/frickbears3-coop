@@ -10,7 +10,8 @@ global.CoopCfg = {
     mask: 0,              // 0 freddy, 1 bonnie, 2 chica (my own mask, sent to the partner)
     devMode: false,
     partnerMask: 1,
-    partnerMaskRaw: -1,   // 0.6.2: mask the partner chose (partnerMask = what we draw; P2 never looks like P1)
+    partnerMaskRaw: -1,
+    cchar: "", partnerChar: "",  // 0.7.4: custom character id (Addons/CoopChars/<id>/), "" = default mask art   // 0.6.2: mask the partner chose (partnerMask = what we draw; P2 never looks like P1)
     loaded: false, fromHost: false
 };
 // 0.6.2: P1 keeps its mask; if P2 picked the same one, P2 is shown with the next mask (freddy->bonnie->chica)
@@ -68,6 +69,7 @@ function coop_cfg_load()
     _g.specReward = ini_read_real("coop", "specreward", 100);
     _g.mask = clamp(ini_read_real("coop", "mask", 0), 0, 2);
     _g.devMode = ini_read_real("coop", "devmode", 0) != 0;
+    _g.cchar = ini_read_string("coop", "char", "");
     ini_close();
     _g.loaded = true;
     coop_cfg_apply("load");
@@ -84,13 +86,14 @@ function coop_cfg_save()
     }
     ini_write_real("coop", "mask", _g.mask);
     ini_write_real("coop", "devmode", _g.devMode ? 1 : 0);
+    ini_write_string("coop", "char", _g.cchar);
     ini_close();
 }
 
 function coop_cfg_msg()
 {
     var _g = global.CoopCfg;
-    return { t: "cfg", repel: _g.repel, revives: _g.revives, jd: _g.jd, bossShared: _g.bossShared, maze: _g.maze, specReward: _g.specReward, mask: _g.mask,
+    return { t: "cfg", repel: _g.repel, revives: _g.revives, jd: _g.jd, bossShared: _g.bossShared, maze: _g.maze, specReward: _g.specReward, mask: _g.mask, cchar: _g.cchar,
         diff: variable_global_exists("Difficulty") ? global.Difficulty : -1 };
 }
 
@@ -117,6 +120,7 @@ function coop_set_options()
         "Spectator reward: " + string(_g.specReward) + "%" + _h,
         "My mask: " + string_upper(coop_mask_name(_g.mask)) + ((_g.partnerMaskRaw >= 0 && coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw) != _g.mask) ? " (same as P1 -> shown " + string_upper(coop_mask_name(coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw))) + ")" : ""),
         "Developer mode: " + (_g.devMode ? "ON" : "OFF"),
+        "Character: " + ((_g.cchar == "") ? "MASK (default)" : string_upper(_g.cchar)) + ((_g.partnerChar != "") ? "  | partner: " + string_upper(_g.partnerChar) : ""),
         "Back"
     ];
 }
@@ -146,6 +150,7 @@ function coop_set_select()
         case 5: _g.specReward = (_g.specReward == 100) ? 50 : ((_g.specReward == 50) ? 0 : 100); break;
         case 6: _g.mask = (_g.mask + 1) mod 3; if (_g.partnerMaskRaw >= 0 && _g.mask == _g.partnerMaskRaw) { _g.mask = (_g.mask + 1) mod 3; } break; // 0.7.3: never the partner's skin (same difficulty for both)
         case 7: _g.devMode = !_g.devMode; break;
+        case 8: _g.cchar = coop_char_next(_g.cchar, _g.partnerChar); global.CoopArt.spr = {}; break;
         default: goto_menu("Co-op", 4); return;
     }
     coop_cfg_save(); coop_cfg_apply("menu"); coop_cfg_send();
@@ -160,6 +165,18 @@ function coop_art_get(_slot, _mask, _kind)
     var _A = global.CoopArt;
     var _key = "P" + string(_slot) + "_" + coop_mask_name(clamp(_mask, 0, 2)) + "_" + _kind;
     if (variable_struct_exists(_A.spr, _key)) { return variable_struct_get(_A.spr, _key); }
+    // 0.7.4: custom character (ready set or Addons/CoopChars/<id>/{portrait,maze,icon}.png)
+    var _ch = (_slot == coop_my_slot()) ? global.CoopCfg.cchar : global.CoopCfg.partnerChar;
+    if (_ch != "")
+    {
+        var _cf = coop_char_dir(_ch) + ((_kind == "bill") ? "maze" : _kind) + ".png";
+        if (file_exists(_cf))
+        {
+            var _cs = sprite_add(_cf, (_kind == "bill") ? 6 : 1, false, false, 0, 0);
+            if (_cs >= 0 && _kind == "bill" && (sprite_get_number(_cs) != 6 || sprite_get_height(_cs) != 64)) { coop_log("CHAR: " + _cf + " must be 6 frames of 32x64 (192x64 strip)"); sprite_delete(_cs); _cs = -1; }
+            if (_cs >= 0) { coop_log("CHAR: loaded " + _cf); variable_struct_set(_A.spr, _key, _cs); return _cs; }
+        }
+    }
     var _f = working_directory + "coop_art/" + _key + ".png";
     var _s = -1;
     if (file_exists(_f))
@@ -231,6 +248,9 @@ function coop_more_packet(_t, _m)
         case "salv": coop_salv_in(_m); break;
         case "cfg":
             _g.partnerMaskRaw = clamp(_m.mask, 0, 2); // never our own mask
+            var _pc = variable_struct_exists(_m, "cchar") ? string(_m.cchar) : "";
+            if (_pc != _g.partnerChar) { _g.partnerChar = _pc; global.CoopArt.spr = {}; coop_log("CHAR: partner character " + ((_pc == "") ? "default" : _pc)); }
+            if (coop_is_client() && _g.cchar != "" && _g.cchar == _pc) { _g.cchar = coop_char_next(_g.cchar, _pc); global.CoopArt.spr = {}; coop_log("CHAR: same character as the host -> mine is now " + _g.cchar); coop_send(coop_cfg_packet_safe()); }
             if (coop_is_client() && _g.mask == _g.partnerMaskRaw) { _g.mask = (_g.mask + 1) mod 3; coop_log("SKIN: same skin as the host -> mine is now " + coop_mask_name(_g.mask)); coop_send(coop_cfg_packet_safe()); }
             if (coop_is_client())
             {
@@ -889,7 +909,7 @@ function coop_maze_me_sitting()
 
 // ===== 0.7.3: maze salvage pick is shared WITHOUT the cutscene (partner gets the same animatronic + an icon top-right) =====
 global.CoopSalv = { icon: -1, iconAt: 0, inN: 0, outN: 0 };
-function coop_cfg_packet_safe() { return { t: "cfg", repel: global.CoopCfg.repel, revives: global.CoopCfg.revives, jd: global.CoopCfg.jd, bossShared: global.CoopCfg.bossShared, maze: global.CoopCfg.maze, specReward: global.CoopCfg.specReward, mask: global.CoopCfg.mask, diff: -1 }; }
+function coop_cfg_packet_safe() { return { t: "cfg", repel: global.CoopCfg.repel, revives: global.CoopCfg.revives, jd: global.CoopCfg.jd, bossShared: global.CoopCfg.bossShared, maze: global.CoopCfg.maze, specReward: global.CoopCfg.specReward, mask: global.CoopCfg.mask, cchar: global.CoopCfg.cchar, diff: -1 }; }
 function coop_salv_out(_id)
 {
     if (!global.Coop.connected || !coop_is_maze_room(room)) { return; }
@@ -916,4 +936,42 @@ function coop_salv_draw()
     var _w = string_width(_t) + 12;
     coop_ui_panel(_gw - _w - 4, 26, _gw - 4, 42);
     draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(make_color_rgb(244, 240, 232)); draw_text(_gw - _w + 2, 27, _t); draw_set_color(c_white);
+}
+
+// ---------------- 0.7.4: custom characters ----------------
+function coop_char_dir(_id) { return working_directory + "Addons/CoopChars/" + _id + "/"; }
+function coop_char_list()
+{
+    var _l = [""];
+    var _f = file_find_first(working_directory + "Addons/CoopChars/*", fa_directory);
+    while (_f != "") { if (_f != "." && _f != ".." && file_exists(coop_char_dir(_f) + "portrait.png")) { array_push(_l, _f); } _f = file_find_next(); }
+    file_find_close();
+    return _l;
+}
+function coop_char_next(_cur, _partner)
+{
+    var _l = coop_char_list(), _n = array_length(_l), _i = 0;
+    for (var k = 0; k < _n; k++) { if (_l[k] == _cur) { _i = k; } }
+    for (var k = 1; k <= _n; k++) { var _c = _l[(_i + k) mod _n]; if (_c == "" || _c != _partner) { return _c; } }
+    return "";
+}
+
+// ---------------- 0.7.4: boss roles (hint panel; P1 distracts, P2 hits) ----------------
+function coop_boss_roles_draw()
+{
+    if (!global.Coop.connected || !boss_fight_night() || !instance_exists(oSalvage)) { return; }
+    var _gw = display_get_gui_width(), _me = coop_my_slot();
+    var _dis = (_me == 1);
+    var _t1 = _dis ? "YOUR ROLE: DISTRACT" : "YOUR ROLE: HIT";
+    var _t2 = _dis ? "Keep Salvage looking at YOU - flash / lure, survive" : "Salvage is busy with P1 - attack now";
+    var _t3 = "Boss HP is SHARED  |  boss attacks each player on their own screen";
+    var _w = max(string_width(_t2), string_width(_t3)) + 16, _x = (_gw - _w) / 2;
+    coop_ui_panel(_x, 20, _x + _w, 70);
+    draw_set_halign(fa_center);
+    draw_set_color(_dis ? make_color_rgb(230, 120, 40) : make_color_rgb(120, 200, 90)); draw_text(_gw / 2, 23, _t1);
+    draw_set_color(c_white); draw_text(_gw / 2, 39, _t2);
+    draw_set_color(make_color_rgb(200, 196, 188)); draw_text(_gw / 2, 54, _t3);
+    var _hp = variable_instance_exists(oSalvage, "HP") ? oSalvage.HP : -1;
+    if (_hp >= 0) { coop_ui_panel(_x, 72, _x + _w, 82); draw_set_color(make_color_rgb(220, 70, 50)); draw_rectangle(_x + 2, 74, _x + 2 + (_w - 4) * clamp(_hp / 100, 0, 1), 80, false); }
+    draw_set_halign(fa_left); draw_set_color(c_white);
 }

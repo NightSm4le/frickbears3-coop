@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 7,
-    modver: "0.7.3",
+    modver: "0.7.4",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -625,8 +625,9 @@ function coop_draw_gui()
         if (!instance_exists(oTitleMenu))
         {
             var _st = "CO-OP " + string_upper(_c.mode) + (_c.connected ? "  " + ((_c.rtt >= 0) ? string(_c.rtt) + "ms" : "...") : "  " + _c.status);
-            coop_ui_panel(3, 3, 3 + string_width(_st) + 8, 18);
-            draw_set_alpha(0.9); draw_set_color(_c.connected ? make_color_rgb(244, 240, 232) : c_yellow); draw_text(7, 4, _st); draw_set_alpha(1); draw_set_color(c_white);
+            var _sy = display_get_gui_height() - 19; // 0.7.4: bottom-left, off the Extras / menu titles
+            coop_ui_panel(3, _sy, 3 + string_width(_st) + 8, _sy + 15);
+            draw_set_alpha(0.9); draw_set_color(_c.connected ? make_color_rgb(244, 240, 232) : c_yellow); draw_text(7, _sy + 1, _st); draw_set_alpha(1); draw_set_color(c_white);
         }
     }
     // --- stage 4: spectator view replaces the death screen; the alive side streams frames ---
@@ -635,7 +636,7 @@ function coop_draw_gui()
     coop_warn_draw();
     coop_feat_draw();
     coop_more_draw();
-    coop_salv_draw();
+    coop_salv_draw(); coop_boss_roles_draw();
     coop_draw_scene_participants();
     coop_sync_draw();
     coop_s3_draw();

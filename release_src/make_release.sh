@@ -10,7 +10,7 @@ wine $P/xdelta3.exe -e -9 -f -s $SRC out_data.win $P/fb3coop.xdelta
 OUT=$(sha256sum out_data.win | cut -d' ' -f1); PS=$(sha256sum $P/fb3coop.xdelta | cut -d' ' -f1)
 # PowerShell 5.1 needs UTF-8 BOM for Cyrillic strings
 { printf '\xef\xbb\xbf'; sed -e "s/@OUT_SHA@/$OUT/" -e "s/@PATCH_SHA@/$PS/" -e "s/@SRC_SHA@/$(sha256sum $SRC|cut -d' ' -f1)/" -e "s/@SRC_NAME@/$SRC_NAME/" install.ps1.in; } > $P/install.ps1
-cp tmpl/*.bat $P/; cp README_RU.txt XDELTA_LICENSE.txt $P/
+cp tmpl/*.bat $P/; cp README_RU.txt XDELTA_LICENSE.txt $P/; mkdir -p $P/Addons; cp -r ../addons/CoopChars $P/Addons/
 ( cd $P && sha256sum xdelta3.exe fb3coop.xdelta install.ps1 > SHA256SUMS.txt && echo "$OUT  data.win (result after patch)" >> SHA256SUMS.txt && echo "$(sha256sum $SRC|cut -d' ' -f1)  data.win ($SRC_NAME, required)" >> SHA256SUMS.txt )
 rm -f FB3-Coop-$VER.zip; (cd pkg && python3 -c "import shutil; shutil.make_archive('../FB3-Coop-$VER','zip','.','FB3-Coop-$VER')")
 rm -f out_data.win
