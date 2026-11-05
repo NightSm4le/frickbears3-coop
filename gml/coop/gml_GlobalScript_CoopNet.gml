@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 7,
-    modver: "0.7.8",
+    modver: "0.7.9",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -21,6 +21,7 @@ global.Coop = {
     rtt: -1,
     status: "offline",
     bot: false,
+    botImplied: "",       // 0.7.9 (S11-1): the -coop-bot* / -coop-autonight flag that switched bot mode on by itself
     autoNight: -1,
     logFile: "coop.log",
     lastClockSend: 0,
@@ -206,6 +207,13 @@ function coop_parse_args()
 {
     var _c = global.Coop;
     var _n = parameter_count();
+    // 0.7.9 (S11-1): every -coop-bot<x> flag and -coop-autonight only run inside bot mode (oCoopNet Step "if (_c.bot)",
+    // coop_more_bot, coop_s3_bot_step...), so any of them now implies -coop-bot (which also skips BEAR IN MIND).
+    for (var i = 0; i < _n; i++)
+    {
+        var _q = parameter_string(i);
+        if (_q != "-coop-bot" && (string_copy(_q, 1, 9) == "-coop-bot" || _q == "-coop-autonight")) { if (_c.botImplied == "") { _c.botImplied = _q; } }
+    }
     for (var i = 0; i < _n; i++)
     {
         var _p = parameter_string(i);
@@ -239,6 +247,11 @@ function coop_parse_args()
     coop_spec_parse_args();
     coop_feat_parse_args();
     coop_more_parse_args();
+    if (_c.botImplied != "")
+    {
+        if (_c.bot) { _c.botImplied = ""; }
+        else { _c.bot = true; coop_log("bot: mode ON (implied by " + _c.botImplied + ", no -coop-bot given)"); }
+    }
 }
 
 function coop_is_client() { return global.Coop.mode == "client"; }
