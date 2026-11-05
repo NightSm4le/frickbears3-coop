@@ -614,16 +614,18 @@ function coop_draw_gui()
     {
         var _bt = "Connection lost - reconnecting... (try " + string(_c.rjN) + "/20)";
         var _bw = string_width(_bt) + 12, _bx = display_get_gui_width() / 2 - _bw / 2;
-        draw_set_alpha(0.75); draw_set_color(c_black); draw_rectangle(_bx, 46, _bx + _bw, 62, false); draw_set_alpha(1);
+        coop_ui_panel(_bx, 46, _bx + _bw, 62);
         draw_set_color(c_yellow); draw_text(_bx + 6, 48, _bt); draw_set_color(c_white);
     }
     // small status line (always, when coop active)
     else if (_c.mode != "off" && !_c.menuOpen && !(room == Office && _c.connected) && !(coop_is_maze_room(room) && _c.connected) && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op"))
     {
-        draw_set_alpha(0.7);
-        draw_set_color(c_white);
-        draw_text(4, 4, "COOP " + _c.mode + ": " + _c.status + (_c.rtt >= 0 ? "  " + string(_c.rtt) + "ms" : ""));
-        draw_set_alpha(1);
+        if (!instance_exists(oTitleMenu))
+        {
+            var _st = "CO-OP " + string_upper(_c.mode) + (_c.connected ? "  " + ((_c.rtt >= 0) ? string(_c.rtt) + "ms" : "...") : "  " + _c.status);
+            coop_ui_panel(3, 3, 3 + string_width(_st) + 8, 18);
+            draw_set_alpha(0.9); draw_set_color(_c.connected ? make_color_rgb(244, 240, 232) : c_yellow); draw_text(7, 4, _st); draw_set_alpha(1); draw_set_color(c_white);
+        }
     }
     // --- stage 4: spectator view replaces the death screen; the alive side streams frames ---
     if (global.CoopS.spec && room == GameOver) { coop_spec_draw(); return; }
@@ -639,7 +641,7 @@ function coop_draw_gui()
     if (!_c.menuOpen) { return; }
     var _gw = display_get_gui_width(), _gh = display_get_gui_height();
     var _x = _gw / 2 - 150, _y = _gh / 2 - 90;
-    draw_set_alpha(0.85); draw_set_color(c_black); draw_rectangle(_x, _y, _x + 300, _y + 175, false); draw_set_alpha(1);
+    coop_ui_panel(_x, _y, _x + 300, _y + 175);
     draw_set_color(c_white); draw_rectangle(_x, _y, _x + 300, _y + 175, true);
     draw_text(_x + 10, _y + 10, "CO-OP (F8)");
     draw_text(_x + 10, _y + 42, "IP:");

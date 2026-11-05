@@ -198,7 +198,7 @@ function coop_hd_draw()
     var _t = "SHARED: LEVEL " + string(_lv) + "/5" + ((current_time - _S.pHdAt < 5000) ? "  (P" + string(coop_partner_slot()) + " LEVEL " + string(_S.pHdLv) + ")" : "");
     draw_set_halign(fa_left); draw_set_valign(fa_top);
     var _w = string_width(_t) + 8;
-    draw_set_alpha(0.65); draw_set_color(c_black); draw_rectangle(4, 48, 4 + _w, 62, false); draw_set_alpha(1);
+    coop_ui_panel(4, 48, 4 + _w, 62);
     draw_set_color(make_color_rgb(244, 240, 232)); draw_text(8, 49, _t); draw_set_color(c_white);
 }
 

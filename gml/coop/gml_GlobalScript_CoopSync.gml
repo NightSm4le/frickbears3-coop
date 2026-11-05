@@ -488,7 +488,7 @@ function coop_sync_draw()
     {
         var _tw = string_width(_txt) + 10, _bx = _gw / 2 - _tw / 2, _by = 26;
         var _a = clamp((_S.noteMs - (current_time - _S.noteAt)) / 400, 0, 1);
-        draw_set_alpha(0.55 * _a); draw_set_color(c_black); draw_rectangle(_bx, _by, _bx + _tw, _by + 15, false);
+        coop_ui_panel(_bx, _by, _bx + _tw, _by + 15);
         draw_set_alpha(_a); draw_set_color(c_yellow); draw_text(_bx + 5, _by + 1, _txt);
         draw_set_alpha(1); draw_set_color(c_white);
     }
@@ -496,7 +496,7 @@ function coop_sync_draw()
     {
         var _w = "Waiting for " + coop_sync_pname() + "...";
         var _ww = string_width(_w) + 10;
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw / 2 - _ww / 2, _gh - 40, _gw / 2 + _ww / 2, _gh - 25, false);
+        coop_ui_panel(_gw / 2 - _ww / 2, _gh - 40, _gw / 2 + _ww / 2, _gh - 25);
         draw_set_alpha(0.6 + 0.4 * (((current_time div 500) mod 2) == 0)); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh - 39, _w); draw_set_halign(fa_left);
         draw_set_alpha(1); draw_set_color(c_white);
     }

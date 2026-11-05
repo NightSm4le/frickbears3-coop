@@ -533,7 +533,7 @@ function coop_score_draw()
     var _wh = make_color_rgb(244, 240, 232), _rd = make_color_rgb(214, 40, 40);
     var _c1 = coop_is_host() ? make_color_rgb(96, 152, 232) : make_color_rgb(240, 152, 64);
     var _c2 = coop_is_host() ? make_color_rgb(240, 152, 64) : make_color_rgb(96, 152, 232);
-    draw_set_alpha(0.85); draw_set_color(c_black); draw_rectangle(_x1, _y1, _x1 + _bw, _y1 + _bh, false); draw_set_alpha(1);
+    coop_ui_panel(_x1, _y1, _x1 + _bw, _y1 + _bh);
     draw_set_color(_wh); draw_rectangle(_x1, _y1, _x1 + _bw, _y1 + _bh, true); draw_rectangle(_x1 + 2, _y1 + 2, _x1 + _bw - 2, _y1 + _bh - 2, true);
     // checker strip like the office wall
     for (var i = 0; i < 35; i++) { draw_set_color((i mod 2) ? _rd : _wh); draw_rectangle(_x1 + 4 + i * 8, _y1 + 4, _x1 + 11 + i * 8, _y1 + 7, false); }

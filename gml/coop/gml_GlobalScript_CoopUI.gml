@@ -240,7 +240,7 @@ function coop_draw_overlay()
     draw_set_halign(fa_left); draw_set_valign(fa_top);
     if (_mode < 2)
     {
-        draw_set_alpha(0.35); draw_set_color(c_black); draw_rectangle(_px, _py, _px + _w, _py + _h, false);
+        coop_ui_panel(_px, _py, _px + _w, _py + _h);
         draw_set_alpha(_flash ? 0.9 : 0.4);
         draw_set_color(_flash ? (_blink ? c_yellow : c_red) : c_white); draw_rectangle(_px, _py, _px + _w, _py + _h, true);
         draw_set_alpha(0.85);
@@ -256,25 +256,25 @@ function coop_draw_overlay()
             if (coop_partner_get("pu", 0)) { _sv = "PANEL"; }
             if (coop_partner_get("fan", 0)) { _sv += "+FAN"; }
             draw_set_color(c_white); draw_text(_px + 3, _py + 1, _txt + string(floor(max(_pw, 0))) + "% " + _sv);
-            draw_set_color(coop_partner_get("d0", 0) ? c_red : c_dkgray); draw_rectangle(_px + 4, _py + 16, _px + 10, _py + 21, false);
-            draw_set_color(coop_partner_get("d1", 0) ? c_red : c_dkgray); draw_rectangle(_px + 13, _py + 16, _px + 19, _py + 21, false);
+            draw_set_color(coop_partner_get("d0", 0) ? make_color_rgb(230, 120, 40) : make_color_rgb(70, 70, 80)); draw_rectangle(_px + 4, _py + 16, _px + 10, _py + 21, false);
+            draw_set_color(coop_partner_get("d1", 0) ? make_color_rgb(230, 120, 40) : make_color_rgb(70, 70, 80)); draw_rectangle(_px + 13, _py + 16, _px + 19, _py + 21, false);
             draw_set_color(c_dkgray); draw_rectangle(_px + 24, _py + 17, _px + 110, _py + 20, false);
-            draw_set_color(_pw > 25 ? c_lime : c_red); draw_rectangle(_px + 24, _py + 17, _px + 24 + 86 * clamp(_pw, 0, 100) / 100, _py + 20, false);
+            draw_set_color(_pw > 25 ? make_color_rgb(120, 200, 90) : make_color_rgb(220, 70, 50)); draw_rectangle(_px + 24, _py + 17, _px + 24 + 86 * clamp(_pw, 0, 100) / 100, _py + 20, false);
             draw_set_color(c_gray); draw_text(_px + 114, _py + 12, (_c.rtt >= 0) ? string(_c.rtt) : "");
         }
         else if (_mode == 1)
         {
             draw_set_color(c_white); draw_text(_px + 3, _py + 1, _txt + string(floor(max(_pw, 0))) + "%");
-            draw_set_color(coop_partner_get("d0", 0) ? c_red : c_dkgray); draw_rectangle(_px + _w - 18, _py + 4, _px + _w - 12, _py + 10, false);
-            draw_set_color(coop_partner_get("d1", 0) ? c_red : c_dkgray); draw_rectangle(_px + _w - 9, _py + 4, _px + _w - 3, _py + 10, false);
+            draw_set_color(coop_partner_get("d0", 0) ? make_color_rgb(230, 120, 40) : make_color_rgb(70, 70, 80)); draw_rectangle(_px + _w - 18, _py + 4, _px + _w - 12, _py + 10, false);
+            draw_set_color(coop_partner_get("d1", 0) ? make_color_rgb(230, 120, 40) : make_color_rgb(70, 70, 80)); draw_rectangle(_px + _w - 9, _py + 4, _px + _w - 3, _py + 10, false);
         }
         else
         {
             draw_set_color(c_white); draw_text(_px + 3, _py + 1, _txt + string(floor(max(_pw, 0))) + "%");
             draw_set_color(c_dkgray); draw_rectangle(_px + 56, _py + 5, _px + _w - 4, _py + 10, false);
-            draw_set_color(_pw > 25 ? c_lime : c_red); draw_rectangle(_px + 56, _py + 5, _px + 56 + (_w - 60) * clamp(_pw, 0, 100) / 100, _py + 10, false);
-            draw_set_color(coop_partner_get("d0", 0) ? c_red : c_dkgray); draw_rectangle(_px + 4, _py + 18, _px + 11, _py + 25, false);
-            draw_set_color(coop_partner_get("d1", 0) ? c_red : c_dkgray); draw_rectangle(_px + 14, _py + 18, _px + 21, _py + 25, false);
+            draw_set_color(_pw > 25 ? make_color_rgb(120, 200, 90) : make_color_rgb(220, 70, 50)); draw_rectangle(_px + 56, _py + 5, _px + 56 + (_w - 60) * clamp(_pw, 0, 100) / 100, _py + 10, false);
+            draw_set_color(coop_partner_get("d0", 0) ? make_color_rgb(230, 120, 40) : make_color_rgb(70, 70, 80)); draw_rectangle(_px + 4, _py + 18, _px + 11, _py + 25, false);
+            draw_set_color(coop_partner_get("d1", 0) ? make_color_rgb(230, 120, 40) : make_color_rgb(70, 70, 80)); draw_rectangle(_px + 14, _py + 18, _px + 21, _py + 25, false);
             var _view = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "SEATED";
             if (coop_partner_get("mk", 0)) { _view = "MASK"; }
             if (coop_partner_get("pu", 0)) { _view = "PANEL"; }
@@ -305,7 +305,7 @@ function coop_draw_overlay()
     {
         var _ht = "CO-OP: P ping G power L lure M mark V revive Tab hide F9 move";
         var _hw = string_width(_ht) + 10;
-        draw_set_alpha(0.5); draw_set_color(c_black); draw_rectangle(_gw / 2 - _hw / 2, _gh - 64, _gw / 2 + _hw / 2, _gh - 50, false);
+        coop_ui_panel(_gw / 2 - _hw / 2, _gh - 64, _gw / 2 + _hw / 2, _gh - 50);
         draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh - 63, _ht); draw_set_halign(fa_left); draw_set_alpha(1);
     }
     coop_draw_alerts();
@@ -325,7 +325,7 @@ function coop_draw_alerts()
     {
         var _tw = string_width(_atxt) + 10;
         var _bx = _gw / 2 - _tw / 2, _by = (variable_struct_exists(global.CoopUI, "strip") && global.CoopUI.strip && room == Office) ? 31 : 26; // 0.6.2: below the cam strip
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_bx, _by, _bx + _tw, _by + 15, false);
+        coop_ui_panel(_bx, _by, _bx + _tw, _by + 15);
         draw_set_alpha(_blink || !_flash ? 1 : 0.6); draw_set_color(_acol); draw_text(_bx + 5, _by + 1, _atxt);
         draw_set_alpha(1);
     }
@@ -352,7 +352,7 @@ function coop_title_options()
 function coop_title_desc()
 {
     var _c = global.Coop;
-    var _s = "Co-op - 2 players, own offices.\nStatus: " + _c.status;
+    var _s = "CO-OP  -  " + _c.status;
     if (_c.connected) { _s += "\nPartner ping: " + ((_c.rtt >= 0) ? string(_c.rtt) + " ms" : "..."); }
     if (_c.focus == 11 || _c.focus == 12) { _s += "\nType, then Enter."; }
     return _s;
@@ -477,3 +477,11 @@ function coop_sub_on_feed()
 }
 function coop_sub_x() { return coop_sub_on_feed() ? 442 : 320; }
 function coop_sub_w() { return coop_sub_on_feed() ? 380 : 400; }
+
+// 0.7.3: shared FNaF-style panel (dark translucent fill + thin light frame), used by every co-op HUD element
+function coop_ui_panel(_x1, _y1, _x2, _y2)
+{
+    draw_set_alpha(0.62); draw_set_color(make_color_rgb(14, 12, 18)); draw_rectangle(_x1, _y1, _x2, _y2, false);
+    draw_set_alpha(0.75); draw_set_color(make_color_rgb(200, 196, 188)); draw_rectangle(_x1, _y1, _x2, _y2, true);
+    draw_set_alpha(1); draw_set_color(c_white);
+}

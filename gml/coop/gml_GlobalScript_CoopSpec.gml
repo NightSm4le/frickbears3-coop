@@ -289,7 +289,7 @@ function coop_spec_draw()
     if (coop_partner_get("mk", 0)) { _view = "MASK"; } if (coop_partner_get("pu", 0)) { _view = "PANEL"; }
     draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(0, 0, _gw, 14, false); draw_set_alpha(1);
     draw_set_color(((current_time div 600) mod 2) ? c_red : c_white); draw_text(4, 1, "SPECTATING PARTNER");
-    draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(2, 16, 54, 74, false); draw_set_alpha(1);
+    coop_ui_panel(2, 16, 54, 74);
     coop_art_partner_portrait(4, 18, 48, 1);
     draw_set_color(c_white); draw_text(6, 62, "P" + string(coop_partner_slot()));
     draw_set_color(c_white);
@@ -304,7 +304,7 @@ function coop_spec_draw()
     draw_set_color(_gReady ? c_white : c_gray); draw_set_halign(fa_center);
     draw_text((_gr[0] + _gr[2]) / 2, _gr[1] + 3, _gUsed ? "POWER USED" : (_s.specGivePending ? "SENDING..." : (_gReady ? "G  +10% POWER" : "WAIT FOR PARTNER")));
     draw_set_halign(fa_left);
-    draw_set_alpha(0.72); draw_set_color(c_black); draw_rectangle(0, _gh - 32, _gw, _gh, false); draw_set_alpha(1);
+    coop_ui_panel(0, _gh - 32, _gw, _gh);
     draw_set_color(c_ltgray);
     draw_text(4, _gh - 29, "P: ping    M: mark partner's camera");
     draw_set_halign(fa_right);
@@ -314,7 +314,7 @@ function coop_spec_draw()
     if (global.CoopCfg.devMode)
     {
         var _dx = max(4, _gw - 274), _dy = 18, _rtt = (_c.rtt >= 0) ? string(_c.rtt) : "--";
-        draw_set_alpha(0.82); draw_set_color(c_black); draw_rectangle(_dx, _dy, _gw - 4, _dy + 76, false); draw_set_alpha(1);
+        coop_ui_panel(_dx, _dy, _gw - 4, _dy + 76);
         draw_set_color(c_yellow); draw_text(_dx + 6, _dy + 3, "DEV STREAM  level " + string(max(_s.inLevel, 0)));
         draw_set_color(c_white);
         draw_text(_dx + 6, _dy + 17, "Frame: " + string(_s.fw) + "x" + string(_s.fh) + "  " + string_format(_s.rfps, 1, 1) + " FPS");
