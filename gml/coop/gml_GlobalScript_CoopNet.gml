@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 8,
-    modver: "0.8.1",
+    modver: "0.8.2",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,

@@ -105,6 +105,9 @@ if (stage == "full")
     need(boss.Contains("function coop_bot_clock(") && boss.Contains("function coop_boss_revive_enter(") && boss.Contains("function coop_boss_restore_step("), "S13-2 revive boss restore missing");
     need(more.Contains("coop_boss_revive_enter()") && more.Contains("coop_boss_restore_step()") && more.Contains("deadDmg"), "S13-2 revive re-entry not wired");
     need(D("gml_GlobalScript_CoopFeat").Contains("coop_bot_clock()") && D("gml_GlobalScript_CoopFeat").Contains("brq") && net.Contains("brq"), "S13-2 bot revive clock / request missing");
+    // 0.8.2 (S14-1 / S14-2)
+    need(D("gml_Object_oCoopNet_Step_0").Contains("officeAt = current_time") && D("gml_Object_oCoopNet_Step_0").Contains("revivedEnter"), "S14-1 officeAt / botdie reset order missing");
+    need(D("gml_GlobalScript_CoopSpec").Contains("botDieAt") && D("gml_GlobalScript_CoopSpec").Contains("forceJs") && D("gml_GlobalScript_CoopSpec").Contains("jumpscare(120"), "S14-2 local Salvage botdie missing");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");

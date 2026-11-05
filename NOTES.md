@@ -186,3 +186,12 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
 - S13-1: roles SOLO only on confirmed death (partner snapshot sp=1 / alive=0) or >4 s away from Office (awayAt); reset on every Office entry.
 - S13-2: boss nights keep global.Timer = (Phase-1)*60 -> bot flags use coop_bot_clock() (seconds since Office entry on boss nights). Dead bot sets snapshot brq=1 (optional field, proto stays 8); bot survivor holds V.
   Revive re-entry (CoopF.revivedEnter) keeps revLeft/aggro, host restores HP = hpKeep - deadDmg (bdmg received while dead), enrage re-applied to the new Salvage (coop_boss_restore_step).
+
+## 0.8.2
+- S14-1: `officeAt` is set in the oCoopNet Step room-change block (before `coop_spec_step`); botdie needs >=1 s in this Office,
+  a fresh partner snapshot with rm=="Office" (when connected); boss night waits for oSalvage (<=20 s, then anim fallback);
+  `botDieDone` is not reset on revive re-entry (`CoopF.revivedEnter`), so one botdie per night.
+- S14-2: botdie sets `CoopF.forceJs` around the kill (bypasses the client token gate: the client only sent a claim and retreated
+  its Salvage) and calls `jumpscare(120, 0, Phase)` directly inside `with (oSalvage)` (no beartrap save). 4 s later a WARNING
+  is logged if still alive.
+- proto 8 unchanged.

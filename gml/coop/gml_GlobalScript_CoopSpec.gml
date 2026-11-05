@@ -18,7 +18,7 @@ global.CoopS = {
     // help
     cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0,
     specGiveUsedKey: "", specGiveRecvKey: "", specGivePending: false, specGiveRequestKey: "",
-    botHelp: -1, botHelpStep: 0, botHelpAt: 0, botDie: -1, botDieDone: false, shotPend: "", shotAt: 0, specShot: false, btnShot: false,
+    botHelp: -1, botHelpStep: 0, botHelpAt: 0, botDie: -1, botDieDone: false, botDieAt: 0, shotPend: "", shotAt: 0, specShot: false, btnShot: false,
     st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, warn: 0, lure: 0, giveIn: 0, warnIn: 0, lureIn: 0, refunds: 0 }
 };
 // [w, h, interval ms]
@@ -158,17 +158,41 @@ function coop_spec_step()
 {
     var _s = global.CoopS, _c = global.Coop;
     // bot: die on purpose at a given timer (picks an active animatronic as the killer)
-    if (_s.botDie >= 0 && !_s.botDieDone && room == Office && variable_global_exists("Timer") && coop_bot_clock() >= _s.botDie && coop_alive())
+    // 0.8.2 (S14-1): only after >= 1 s in THIS Office (officeAt is set on the room change, before this step) and, in co-op,
+    // only while the partner is in the Office too (so I become a spectator, not a full GameOver).
+    // Boss night: wait for Salvage (up to 20 s after entry, the opener runs first) - no Freddy fallback meanwhile.
+    if (_s.botDie >= 0 && !_s.botDieDone && room == Office && variable_global_exists("Timer") && coop_alive()
+        && current_time - global.CoopMore.officeAt >= 1000 && coop_bot_clock() >= _s.botDie
+        && (!_c.connected || (coop_partner_get("rm", "") == "Office" && current_time - _c.partnerSnapAt < 2500)))
     {
-        // 0.8.1: boss night (Timer stays 0, no shared animatronics) -> Salvage kills me through his own jumpscare
-        if (instance_exists(oSalvage) && variable_global_exists("Night") && boss_fight_night()) { _s.botDieDone = true; coop_log("bot: dying on purpose at clock " + string_format(coop_bot_clock(), 1, 1) + " killer Salvage"); with (oSalvage) { salvage_jumpscare(0); } }
-        var _k = -1; if (!_s.botDieDone) for (var n = 0; n < array_length(global.CoopA.ids); n++) { var _q = global.CoopA.ids[n]; if (coop_anim_inst(_q) != noone && !coop_partner_holds(_q)) { _k = _q; break; } }
-        if (_k >= 0)
+        var _boss = variable_global_exists("Night") && boss_fight_night();
+        if (_boss && instance_exists(oSalvage))
         {
-            _s.botDieDone = true;
-            coop_log("bot: dying on purpose at timer " + string(global.Timer) + " killer " + coop_anim_name(_k));
-            jumpscare(_k);
+            // 0.8.2 (S14-2): kill the LOCAL player: bypass the co-op attack-token gate (the client would only send a claim
+            // and the host's Salvage would get the kill) and use the plain Salvage jumpscare (no beartrap save)
+            _s.botDieDone = true; _s.botDieAt = current_time;
+            coop_log("bot: dying on purpose at clock " + string_format(coop_bot_clock(), 1, 1) + " killer Salvage (local, gate bypassed)");
+            global.CoopF.forceJs = true;
+            with (oSalvage) { jumpscare(120, 0, Phase); }
+            global.CoopF.forceJs = false;
         }
+        else if (!_boss || current_time - global.CoopMore.officeAt > 20000)
+        {
+            var _k = -1; for (var n = 0; n < array_length(global.CoopA.ids); n++) { var _q = global.CoopA.ids[n]; if (coop_anim_inst(_q) != noone && !coop_partner_holds(_q)) { _k = _q; break; } }
+            if (_k >= 0)
+            {
+                _s.botDieDone = true; _s.botDieAt = current_time;
+                coop_log("bot: dying on purpose at timer " + string(global.Timer) + " killer " + coop_anim_name(_k));
+                global.CoopF.forceJs = true;
+                jumpscare(_k);
+                global.CoopF.forceJs = false;
+            }
+        }
+    }
+    if (_s.botDieDone && variable_struct_exists(_s, "botDieAt") && _s.botDieAt > 0 && current_time - _s.botDieAt > 4000)
+    {
+        _s.botDieAt = 0;
+        if (room == Office && coop_alive() && !_s.spec) { coop_log("bot: WARNING botdie did not kill me (still alive 4 s later)"); }
     }
     // deliver delayed acks (bot: simulated slow relay)
     while (array_length(_s.ackQ) > 0 && current_time >= _s.ackQ[0][0]) { coop_send({ t: "fack", s: _s.ackQ[0][1] }); array_delete(_s.ackQ, 0, 1); }
