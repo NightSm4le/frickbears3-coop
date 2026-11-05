@@ -87,6 +87,7 @@ if (stage == "full")
     // 0.7.7
     need(D("gml_Object_oTitleMenu_Draw_77").Contains("coop_set_row_visible("), "S9-1 Co-op Settings header clip hook missing");
     need(more.Contains("function coop_set_row_visible(") && more.Contains("hostDiff"), "S9-1/S9-2 settings helpers missing");
+    need(more.Contains("function coop_maze_set_sit(") && more.Contains("coop_maze_set_sit(true, \"bot\")") && more.Contains("coop_maze_set_sit(false, \"bot\")"), "S10-1 bot sit must use the shared sit path");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");

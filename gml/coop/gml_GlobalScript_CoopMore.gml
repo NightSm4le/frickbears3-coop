@@ -30,7 +30,7 @@ global.CoopB = { lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, d
     botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapIn: 0, scrapOut: 0, logAt: 0 };
 global.CoopM = { sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
     caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
-    logAt: 0, followed: false, shotAt: 0, targetLog: "", sit: false, psit: 0, botSit: -1, botSitDone: false, botSitUntil: 0, botSitOn: false, mzRoom: -1, mzAt: 0, sitShot: false, sitLog: -1 };
+    logAt: 0, followed: false, shotAt: 0, targetLog: "", sit: false, psit: 0, botSit: -1, botSitDone: false, botSitUntil: 0, botSitOn: false, mzRoom: -1, mzAt: 0, sitShot: false, sitLog: -1, botSitWait: false, botSitWaitAt: 0 };
 global.CoopE = { pMoney: -1, pBuys: [], buysIn: 0, buysOut: 0, partnerEr: -1, botBuy: -1, botBuyDone: false, shown: 0 };
 global.CoopMore = { pwAt: 0, botAdv: -1, botAdvAt: 0, roomAt: 0, officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
 
@@ -525,7 +525,9 @@ function coop_maze_step()
     {
         _M.lastSend = current_time;
         var _cam = oCamera3DMaze;
-        coop_send({ t: "mz", s: coop_maze_me_sitting(), x: _cam.x, y: _cam.y, d: _cam.CameraRotationH + 180, mv: (_cam.Loudness > 0) ? 1 : 0, al: !_M.meCaught && !instance_exists(oMinigameJumpscare), rm: room_get_name(room) });
+        var _ms = coop_maze_me_sitting();
+        if (_ms != _M.sitLog) { if (_M.sitLog != -1 || _ms) { coop_log("MAZE: my pose -> " + (_ms ? "sitting" : "standing") + " (sent to partner)"); } _M.sitLog = _ms; }
+        coop_send({ t: "mz", s: _ms, x: _cam.x, y: _cam.y, d: _cam.CameraRotationH + 180, mv: (_cam.Loudness > 0) ? 1 : 0, al: !_M.meCaught && !instance_exists(oMinigameJumpscare), rm: room_get_name(room) });
     }
     // host ghost: run the normal death once the partner is out of the maze or caught
     if (_M.ghost && !_M.ghostDone && (!_M.sync || !_M.pAlive)) { _M.ghostDone = true; coop_maze_die_local("deferred: partner out of the maze or caught"); }
@@ -726,7 +728,7 @@ function coop_more_step()
             _B.aggro = 0; _B.pDeadSeen = false; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
             _E.partnerEr = -1; _E.botBuyDone = false;
         }
-        if (coop_is_maze_room(room)) { _M.mzRoom = room; _M.mzAt = current_time; _M.botSitOn = false; _M.sit = false; _M.psit = 0; _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
+        if (coop_is_maze_room(room)) { _M.mzRoom = room; _M.mzAt = current_time; _M.botSitOn = false; _M.botSitWait = false; _M.sitLog = -1; _M.sit = false; _M.psit = 0; _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
         _X.prevRoom = room;
     }
     // money in the snapshot-free channel: send on change
@@ -900,20 +902,43 @@ function coop_maze_crouch(_held)
     var _M = global.CoopM;
     if (!instance_exists(oTextBox) && (keyboard_check_pressed(ord("C")) || keyboard_check_pressed(vk_control)))
     {
-        _M.sit = !_M.sit;
         _M.botSitOn = false; // 0.7.7 (S9-3): a manual C/Ctrl takes over; the bot timer never cancels it
-        coop_log("MAZE: I " + (_M.sit ? "sat down" : "stood up") + " (C/Ctrl)");
+        coop_maze_set_sit(!_M.sit, "C/Ctrl");
     }
     // 0.7.7 (S9-3): the bot sit only starts once the maze room was entered (oCoopNet saw it) and has been up for 1 s,
     // the delay counts from that entry, and only the bot's own sit is ended by the bot.
     if (_M.botSit >= 0 && instance_exists(oCamera3DMaze) && coop_is_maze_room(room) && _M.mzRoom == room && current_time - _M.mzAt >= 1000)
     {
         var _sec = (current_time - _M.mzAt) / 1000;
-        if (!_M.botSitDone && _sec >= max(1, _M.botSit)) { _M.botSitDone = true; _M.botSitOn = true; _M.sit = true; _M.botSitUntil = current_time + 15000; coop_log("bot: FORCED sit for 15 s (-coop-botsit)"); }
-        else if (_M.botSitOn && current_time > _M.botSitUntil) { _M.botSitOn = false; _M.sit = false; coop_log("bot: stand up"); }
+        // 0.7.8 (S10-1): the game only crouches when nothing is locked on (LockOnTarget == -4) and C/Ctrl only works with no
+        // dialog open; the maze opens with a dialog/lock-on, so the forced sit used to flip _M.sit while the pose (and the
+        // "s" sent to the partner) stayed standing. The bot now waits for the same conditions and goes through coop_maze_set_sit.
+        var _free = !instance_exists(oTextBox) && !instance_exists(oMinigameJumpscare) && oCamera3DMaze.LockOnTarget == -4;
+        if (!_M.botSitDone && _sec >= max(1, _M.botSit))
+        {
+            if (!_free)
+            {
+                if (!_M.botSitWait) { _M.botSitWait = true; _M.botSitWaitAt = current_time; coop_log("bot: sit waits for dialog / lock-on to end"); }
+                // like -coop-botlook (0.6.4): a dialog nobody closes (opening NPC) is closed 5 s later, bot flag only
+                else if (instance_exists(oTextBox) && !instance_exists(oMinigameJumpscare) && current_time - _M.botSitWaitAt > 5000) { coop_log("bot: dialog still open -> closed for -coop-botsit"); with (oTextBox) { instance_destroy(); } _M.botSitWaitAt = current_time; }
+            }
+            else if (_M.sit) { _M.botSitDone = true; coop_log("bot: already sitting (manual), -coop-botsit skipped"); }
+            else { _M.botSitDone = true; _M.botSitOn = true; _M.botSitUntil = current_time + 15000; coop_log("bot: FORCED sit for 15 s (-coop-botsit)"); coop_maze_set_sit(true, "bot"); }
+        }
+        else if (_M.botSitOn && current_time > _M.botSitUntil) { _M.botSitOn = false; coop_log("bot: stand up"); coop_maze_set_sit(false, "bot"); }
         if (_M.botSitDone && !_M.sitShot && current_time > _M.botSitUntil - 7000) { _M.sitShot = true; global.CoopMore.shotReq = "maze_sit"; global.CoopMore.shotAt = current_time; }
     }
     return _held || _M.sit;
+}
+
+// 0.7.8 (S10-1): the one path for every sit/stand (C/Ctrl and -coop-botsit): flag, log, and an immediate "mz" to the partner
+function coop_maze_set_sit(_on, _why)
+{
+    var _M = global.CoopM;
+    if (_M.sit == _on) { return; }
+    _M.sit = _on;
+    _M.lastSend = 0; // next coop_maze_step sends "mz" right away (s follows the real pose, see coop_maze_me_sitting)
+    coop_log("MAZE: I " + (_on ? "sat down" : "stood up") + " (" + _why + ")");
 }
 
 function coop_maze_me_sitting()
