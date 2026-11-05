@@ -97,6 +97,7 @@ function coop_spec_skip_count(_id)
 function coop_spec_gameover_create()
 {
     var _s = global.CoopS;
+    coop_prepare_night(); // 0.8.4 (CRASH-GO): Deaths in the shape vanilla Create expects (Endless: number) on EVERY path
     if (!_s.armed) { return false; }
     _s.armed = false;
     if (coop_partner_alive_in_office())
@@ -111,6 +112,7 @@ function coop_spec_gameover_create()
     }
     coop_log("SPECTATOR: partner no longer alive at GameOver -> normal death");
     coop_spec_count_now();
+    coop_prepare_night(); // 0.8.4 (CRASH-GO): again after the late count_jumpscare, right before vanilla Create runs
     return false;
 }
 

@@ -208,3 +208,15 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
 - M2: `coop_pause_requested(local)` refuses in a maze room while oTextBox exists (`CoopM.pauseBlockAt`, maze HUD message 2.5 s);
   remote pause packets still open the menu. M1 (Rabbit/Purple crouch obstacle) skipped. M3 bot-only, no change.
 - proto 8 unchanged, modver 0.8.3.
+
+## 0.8.4 (user crashes 2026-11-05)
+- CRASH-TB: `oTextBox_Fredbear` has its own Create/`initialize()` without `CGPFunction`; `coop_tb_forward_self` (host applying a client
+  `tbreq`) read it -> "Variable oTextBox_Fredbear.CGPFunction not set" in oCoopNet Networking. Now `coop_tb_run_page_funcs()` reads
+  `Function`/`CGPFunction` only via `variable_instance_exists` + `coop_tb_arr_at()`; `coop_tb_can` checks every field; the forward is in
+  try/catch (logs "SYNC tb: forward failed"). Same helper in `coop_bot_textbox_forward`.
+- CRASH-GO: Endless keeps `global.Deaths` a NUMBER (vanilla oGameOver Create: `global.Deaths += Repeats`). `coop_prepare_night()`
+  (called by every count_jumpscare) made it an array -> "DoAdd :2: illegal array use" on every Endless death. Now Endless -> number
+  (array summed back), other nights -> array. Called at the start of `coop_spec_gameover_create` (and after the late count), on every
+  Office entry and in `coop_apply_night` Endless.
+- `-coop-botmaze` without a night number: clamp 1..5 (was `_rooms[-1]`).
+- proto 8 unchanged, modver 0.8.4.
