@@ -7,7 +7,7 @@ global.CoopF = {
     // marks
     marks: [], markCd: 0, botMark: -1, botMarkDone: false, markShotAt: 0,
     // revive
-    revLeft: 1, revHold: 0, revPend: undefined, invulUntil: 0, botRevive: -1, revShotAt: 0, revHoldShot: false,
+    revLeft: 1, revHold: 0, revPend: undefined, revivedEnter: false, invulUntil: 0, botRevive: -1, revShotAt: 0, revHoldShot: false,
     // joint door event
     jd: { state: "idle", side: 0, t0: 0, t1: 0, okMe: -1, okP: -1, resAt: 0, done: false, sent: false, outAt: 0, outOk: -1 },
     botJd: -1, botJdClose: 1, jdShotWarn: false, jdShotWin: false,
@@ -27,14 +27,14 @@ function coop_feat_parse_args()
     {
         var _p = parameter_string(i);
         if (_p == "-coop-savetag" && i + 1 < _n) { i++; _f.saveTagArg = "_" + string_lettersdigits(parameter_string(i)); }
-        else if (_p == "-coop-unlockall") { _f.unlockAll = true; } // 0.6.2 tester flag: Extras / Custom Night / bosses unlocked in the CO-OP save only
-        else if (_p == "-coop-botmark" && i + 1 < _n) { i++; _f.botMark = real(parameter_string(i)); }
-        else if (_p == "-coop-botrevive" && i + 1 < _n) { i++; _f.botRevive = real(parameter_string(i)); }
-        else if (_p == "-coop-botjd" && i + 1 < _n) { i++; _f.botJd = real(parameter_string(i)); }
-        else if (_p == "-coop-botjdclose" && i + 1 < _n) { i++; _f.botJdClose = real(parameter_string(i)); }
-        else if (_p == "-coop-botwarnself" && i + 1 < _n) { i++; _f.botWarnSelf = real(parameter_string(i)); }
-        else if (_p == "-coop-botrlure" && i + 1 < _n) { i++; _f.botRlure = real(parameter_string(i)); }
-        else if (_p == "-coop-botspecmark" && i + 1 < _n) { i++; _f.botSpecMark = real(parameter_string(i)); }
+        else if (_p == "-coop-unlockall") { _f.unlockAll = true; if (_f.saveTagArg == "") { _f.saveTagArg = "_unlockall"; } } // 0.6.2 tester flag: Extras / Custom Night / bosses unlocked in the CO-OP save only
+        else if (_p == "-coop-botmark" && i + 1 < _n) { i++; _f.botMark = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botrevive" && i + 1 < _n) { i++; _f.botRevive = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botjd" && i + 1 < _n) { i++; _f.botJd = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botjdclose" && i + 1 < _n) { i++; _f.botJdClose = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botwarnself" && i + 1 < _n) { i++; _f.botWarnSelf = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botrlure" && i + 1 < _n) { i++; _f.botRlure = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botspecmark" && i + 1 < _n) { i++; _f.botSpecMark = coop_arg_num(parameter_string(i), 0); }
     }
 }
 
@@ -339,7 +339,12 @@ function coop_revive_step()
         _f.revHold = 0; return;
     }
     var _hold = keyboard_check(ord("V")) && coop_help_key_free(ord("V"));
-    if (_f.botRevive >= 0 && _c.bot && global.Timer >= _f.botRevive) { _hold = true; }
+    // 0.8.1 (S13-2): boss nights keep global.Timer at 0 (it is the boss phase clock), so the bot uses coop_bot_clock();
+    // the DEAD side's -coop-botrevive also works: its snapshot asks (brq=1) and a bot survivor starts holding V
+    var _botWhy = "";
+    if (_f.botRevive >= 0 && _c.bot && coop_bot_clock() >= _f.botRevive) { _hold = true; _botWhy = "-coop-botrevive " + string(_f.botRevive); }
+    else if (_c.bot && coop_partner_get("brq", 0) == 1) { _hold = true; _botWhy = "partner asked (its -coop-botrevive)"; }
+    if (_botWhy != "" && _f.revHold <= 0) { coop_log("bot: revive hold starts (" + _botWhy + ", clock " + string_format(coop_bot_clock(), 1, 1) + ")"); }
     if (!_hold) { _f.revHold = 0; return; }
     _f.revHold += delta_time / 1000;
     // the reviver's office is vulnerable while holding: doors forced open, no cams/mask
@@ -406,6 +411,7 @@ function coop_feat_office_enter()
     _f.jd.state = "idle";
     if (_f.revPend == undefined) { return; }
     var _p = _f.revPend; _f.revPend = undefined;
+    _f.revivedEnter = true; // 0.8.1 (S13-2): coop_more_step keeps the boss state / revive counter for this re-entry
     var _tm = coop_is_host() ? coop_partner_get("tm", -1) : global.Coop.hostTimer;
     if (is_numeric(_tm) && _tm > 0) { global.Timer = _tm; }
     global.Power = min(_p.pw, global.Power);
@@ -533,7 +539,7 @@ function coop_score_draw()
     var _wh = make_color_rgb(244, 240, 232), _rd = make_color_rgb(214, 40, 40);
     var _c1 = coop_is_host() ? make_color_rgb(96, 152, 232) : make_color_rgb(240, 152, 64);
     var _c2 = coop_is_host() ? make_color_rgb(240, 152, 64) : make_color_rgb(96, 152, 232);
-    draw_set_alpha(0.85); draw_set_color(c_black); draw_rectangle(_x1, _y1, _x1 + _bw, _y1 + _bh, false); draw_set_alpha(1);
+    coop_ui_panel(_x1, _y1, _x1 + _bw, _y1 + _bh);
     draw_set_color(_wh); draw_rectangle(_x1, _y1, _x1 + _bw, _y1 + _bh, true); draw_rectangle(_x1 + 2, _y1 + 2, _x1 + _bw - 2, _y1 + _bh - 2, true);
     // checker strip like the office wall
     for (var i = 0; i < 35; i++) { draw_set_color((i mod 2) ? _rd : _wh); draw_rectangle(_x1 + 4 + i * 8, _y1 + 4, _x1 + 11 + i * 8, _y1 + 7, false); }
@@ -641,6 +647,6 @@ function coop_unlock_all()
     if (!_need) { return; }
     for (var i = 0; i < array_length(_ua); i++) { _ua[i] = true; }
     if (variable_global_exists("UnlockedTrophies") && is_array(global.UnlockedTrophies) && array_length(global.UnlockedTrophies) > 47) { global.UnlockedTrophies[47] = true; }
-    coop_log("UNLOCK: -coop-unlockall -> all animatronics + trophy 47 unlocked (co-op save " + global.CoopSaveTag + " only)");
+    coop_log("UNLOCK: " + ((variable_struct_exists(global.CoopF, "unlockBuild") && global.CoopF.unlockBuild) ? "Unlock All build" : "-coop-unlockall") + " -> all animatronics + trophy 47 unlocked (co-op save " + global.CoopSaveTag + " only)");
     if (instance_exists(oTitleMenu)) { with (oTitleMenu) { if (CurMenu == "Title" && !Transitioning) { goto_menu("Title", 0); } } }
 }

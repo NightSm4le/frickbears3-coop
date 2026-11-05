@@ -68,9 +68,9 @@ if (stage == "full")
     need(sync.Contains("tbreq") && sync.Contains("coop_tb_request(arg1)"), "host-authoritative dialogue input missing");
     need(sync.Contains("method(id, game_text)"), "dialogue branch does not bind game_text to its textbox");
     var moreChecks = D("gml_GlobalScript_CoopMore");
-    need(moreChecks.Contains("SCRAPTRAP: ") && moreChecks.Contains("instance_find(oCamera3DMaze"), "shared task explanation or guarded maze HUD missing");
+    need(moreChecks.Contains("SCRAPTRAP  done ") && moreChecks.Contains("Partner finished: ") && moreChecks.Contains("instance_find(oCamera3DMaze"), "shared task explanation or guarded maze HUD missing");
     var ui = D("gml_GlobalScript_CoopUI");
-    need(ui.Contains("coop_draw_scene_participants") && ui.Contains("P\" + string(_me)"), "co-op participants are not shown during story dialogs");
+    need(ui.Contains("coop_draw_scene_participants") && (ui.Contains("P\" + string(_me)") || ui.Contains("PLAYER \" + string(_me)")), "co-op participants are not shown during story dialogs");
     need(ui.Contains("function coop_draw_night_participants()") && ui.Contains("coop_scene_mod_sprite(_otherName)"), "both players are not drawn on the night location card");
     need(ui.Contains("addons/") && ui.Contains("/selection.png") && ui.Contains("sprite_add(_path, 2"), "location card does not load a modded guard selection sprite");
     need(ui.Contains("string_pos(\"..\", arg0)") && ui.Contains("string_pos(\"\\\\\", arg0)"), "remote mod sprite path is not validated");
@@ -82,8 +82,40 @@ if (stage == "full")
     foreach (var n in new[] { "gml_Object_oPauser_Step_2", "gml_Object_oPersistentPauser_Step_2" })
     {
         var pz = D(n);
-        need(pz.Contains("coop_pause_requested()") && pz.Contains("coop_pause_on_close()"), n + " pause sync hooks missing");
+        need(pz.Contains("coop_pause_requested(") && pz.Contains("coop_pause_on_close()"), n + " pause sync hooks missing");
     }
+    // 0.7.7
+    need(D("gml_Object_oTitleMenu_Draw_77").Contains("coop_set_row_visible("), "S9-1 Co-op Settings header clip hook missing");
+    need(more.Contains("function coop_set_row_visible(") && more.Contains("hostDiff"), "S9-1/S9-2 settings helpers missing");
+    need(more.Contains("function coop_maze_set_sit(") && more.Contains("coop_maze_set_sit(true, \"bot\")") && more.Contains("coop_maze_set_sit(false, \"bot\")"), "S10-1 bot sit must use the shared sit path");
+    need(net.Contains("botImplied") && net.Contains("implied by "), "S11-1 -coop-bot* flags must imply bot mode");
+    // 0.8.0 (215-sync / 215-boss)
+    var story = D("gml_GlobalScript_CoopStory");
+    need(story.Contains("function coop_story_apply(") && story.Contains("function coop_story_merge_in(") && story.Contains("CCStory"), "215-sync host story mirror missing");
+    need(net.Contains("coop_story_packet("), "215-sync packets not dispatched");
+    need(net.Contains("story = coop_story_collect()"), "215-sync story not in the night payload");
+    need(net.Contains("coop_story_apply("), "215-sync night payload not applied");
+    need(net.Contains("coop_story_save_merge("), "215-sync save merge missing");
+    need(D("gml_Object_oCoopNet_Step_0").Contains("coop_story_step()"), "215-sync step hook missing");
+    var boss = D("gml_GlobalScript_CoopBoss");
+    need(boss.Contains("function coop_boss_roles_step(") && boss.Contains("MoveTimer") && boss.Contains("HPDrainRate") && boss.Contains("function coop_boss_roles_draw("), "215-boss role mechanics missing");
+    need(more.Contains("coop_boss_roles_step()") && net.Contains("_s.bf = coop_boss_flashing()"), "215-boss roles not wired");
+    // 0.8.1 (S13-1 / S13-2)
+    need(boss.Contains("function coop_boss_partner_dead(") && boss.Contains("awayAt"), "S13-1 SOLO grace missing");
+    need(boss.Contains("function coop_bot_clock(") && boss.Contains("function coop_boss_revive_enter(") && boss.Contains("function coop_boss_restore_step("), "S13-2 revive boss restore missing");
+    need(more.Contains("coop_boss_revive_enter()") && more.Contains("coop_boss_restore_step()") && more.Contains("deadDmg"), "S13-2 revive re-entry not wired");
+    need(D("gml_GlobalScript_CoopFeat").Contains("coop_bot_clock()") && D("gml_GlobalScript_CoopFeat").Contains("brq") && net.Contains("brq"), "S13-2 bot revive clock / request missing");
+    // 0.8.2 (S14-1 / S14-2)
+    need(D("gml_Object_oCoopNet_Step_0").Contains("officeAt = current_time") && D("gml_Object_oCoopNet_Step_0").Contains("revivedEnter"), "S14-1 officeAt / botdie reset order missing");
+    need(D("gml_GlobalScript_CoopSpec").Contains("botDieAt") && D("gml_GlobalScript_CoopSpec").Contains("forceJs") && D("gml_GlobalScript_CoopSpec").Contains("jumpscare(120"), "S14-2 local Salvage botdie missing");
+    // 0.8.3 (UX-S16)
+    need(D("gml_GlobalScript_CoopSpec").Contains("function coop_spec_dying_draw(") && D("gml_GlobalScript_CoopSpec").Contains("armedAt") && net.Contains("coop_spec_dying_draw()") && net.Contains("room == Office && global.CoopS.armed"), "S16-B2/B3 dying overlay / alive latch missing");
+    need(net.Contains("PAUSE: refused - dialog open") && more.Contains("Finish the dialog first"), "S16-M2 maze dialog pause guard missing");
+    need(D("gml_GlobalScript_CoopUI").Contains("Co-op HUD hidden (Tab to show)") && D("gml_Object_oCoopNet_Step_0").Contains("F8: co-op menu is closed during a night") && D("gml_Object_oCoopNet_Step_0").Contains("hintSeen"), "S16-O1/O2 HUD hint / key feedback missing");
+    need(net.Contains("modver: \"0.8.3\""), "modver not 0.8.3");
+    bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
+    var ncreate = D("gml_Object_oCoopNet_Create_0");
+    need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");
     if (adminCheats)
     {
         need(Data.Code.ByName("gml_GlobalScript_CoopAdmin") != null, "admin cheats script missing");

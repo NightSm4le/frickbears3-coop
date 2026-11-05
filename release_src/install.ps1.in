@@ -2,7 +2,7 @@
 # The original folder is only READ (never written). Usage: install.bat  (or: powershell -ExecutionPolicy Bypass -File install.ps1 [-GameDir "C:\...\Frickbears3"] [-DestName frickbears3-coop])
 param([string]$GameDir = "", [string]$DestName = "frickbears3-coop")
 $ErrorActionPreference = "Stop"
-$SRC_SHA   = "f2cdfb32fabd6b838ecb89bac10bc1cc956a77565fc2530ce1c6f9b9ffd0e38a"   # clean data.win v2.0.2
+$SRC_SHA   = "@SRC_SHA@"   # base data.win (@SRC_NAME@)
 $OUT_SHA   = "@OUT_SHA@"                                                          # patched data.win
 $PATCH_SHA = "@PATCH_SHA@"
 $XD_SHA    = "6855c01cf4a1662ba421e6f95370cf9afa2b3ab6c148473c63efe60d634dfb9a"   # xdelta3-3.1.0-x86_64.exe (github.com/jmacd/xdelta-gpl, GPG-signed zip)
@@ -29,7 +29,7 @@ $srcData = Join-Path $GameDir "data.win"
 if (!(Test-Path -LiteralPath (Join-Path $GameDir "Frickbears3.exe")) -or !(Test-Path -LiteralPath $srcData)) { Fail "В '$GameDir' нет Frickbears3.exe или data.win." }
 Write-Host "Проверяю SHA-256 исходного data.win..."
 $h = Sha $srcData
-if ($h -ne $SRC_SHA) { Fail "data.win не совпадает с чистой версией v2.0.2 (SHA-256 $h). Нужна чистая, немодифицированная игра." }
+if ($h -ne $SRC_SHA) { Fail "data.win не совпадает с базой @SRC_NAME@ (SHA-256 $h)." }
 
 $parent = Split-Path -Parent ((Resolve-Path -LiteralPath $GameDir).Path)
 $dest = Join-Path $parent $DestName; $n = 2

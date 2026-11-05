@@ -10,8 +10,10 @@ global.CoopCfg = {
     mask: 0,              // 0 freddy, 1 bonnie, 2 chica (my own mask, sent to the partner)
     devMode: false,
     partnerMask: 1,
-    partnerMaskRaw: -1,   // 0.6.2: mask the partner chose (partnerMask = what we draw; P2 never looks like P1)
-    loaded: false, fromHost: false
+    partnerMaskRaw: -1,
+    cchar: "", partnerChar: "",  // 0.7.4: custom character id (Addons/CoopChars/<id>/), "" = default mask art   // 0.6.2: mask the partner chose (partnerMask = what we draw; P2 never looks like P1)
+    loaded: false, fromHost: false,
+    hostDiff: -1          // 0.7.7 (S9-2): host's shared difficulty as last received by the client (-1 = not synced yet)
 };
 // 0.6.2: P1 keeps its mask; if P2 picked the same one, P2 is shown with the next mask (freddy->bonnie->chica)
 function coop_mask_shown(_slot, _own, _other) { return (_slot == 2 && _own == _other) ? ((_own + 1) mod 3) : _own; }
@@ -24,11 +26,11 @@ function coop_mask_fix()
 function coop_mask_name(_i) { var _n = ["freddy", "bonnie", "chica"]; return _n[clamp(_i, 0, 2)]; }
 
 global.CoopArt = { tried: false, spr: {} };
-global.CoopB = { lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, dmgIn: 0, aggro: 0, pDeadSeen: false, meDeadSeen: false,
-    botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapIn: 0, scrapOut: 0, logAt: 0 };
-global.CoopM = { sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
+global.CoopB = { hpKeep: -1, deadDmg: 0, restoreHP: -1, reAggro: 0, lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, dmgIn: 0, aggro: 0, pDeadSeen: false, meDeadSeen: false,
+    botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapTotal: 0, scrapIn: 0, scrapOut: 0, logAt: 0 };
+global.CoopM = { pauseBlockAt: -100000, sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
     caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
-    logAt: 0, followed: false, shotAt: 0, targetLog: "" };
+    logAt: 0, followed: false, shotAt: 0, targetLog: "", sit: false, psit: 0, botSit: -1, botSitDone: false, botSitUntil: 0, botSitOn: false, mzRoom: -1, mzAt: 0, sitShot: false, sitLog: -1, botSitWait: false, botSitWaitAt: 0 };
 global.CoopE = { pMoney: -1, pBuys: [], buysIn: 0, buysOut: 0, partnerEr: -1, botBuy: -1, botBuyDone: false, shown: 0 };
 global.CoopMore = { pwAt: 0, botAdv: -1, botAdvAt: 0, roomAt: 0, officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
 
@@ -39,18 +41,18 @@ function coop_more_parse_args()
     {
         var _p = parameter_string(i);
         var _v = (i + 1 < _n) ? parameter_string(i + 1) : "";
-        if (_p == "-coop-botboss") { i++; _B.botBoss = real(_v); }
-        else if (_p == "-coop-botbossdmg") { i++; _B.botBossDmg = real(_v); }
-        else if (_p == "-coop-botscrap") { i++; _B.botScrap = real(_v); }
-        else if (_p == "-coop-botmaze") { i++; _M.botMaze = real(_v); }
-        else if (_p == "-coop-botmazeapproach") { i++; _M.botApproach = real(_v); }
-        else if (_p == "-coop-botmazeface") { i++; _M.botFace = real(_v); }
-        else if (_p == "-coop-botmazeexit") { i++; _M.botExit = real(_v); }
-        else if (_p == "-coop-botmazespawn") { i++; _M.botSpawn = real(_v); }
-        else if (_p == "-coop-botbuy") { i++; _E.botBuy = real(_v); }
-        else if (_p == "-coop-botadvance") { i++; global.CoopMore.botAdv = real(_v); }
-        else if (_p == "-coop-botsettings") { i++; global.CoopMore.botSet = real(_v); }
-        else if (_p == "-coop-mask") { i++; global.CoopCfg.mask = clamp(real(_v), 0, 2); global.CoopCfg.loaded = true; }
+        if (_p == "-coop-botboss") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _B.botBoss = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botbossdmg") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _B.botBossDmg = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botscrap") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _B.botScrap = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmaze") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botMaze = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmazeapproach") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botApproach = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmazeface") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botFace = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmazeexit") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botExit = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmazespawn") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botSpawn = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botbuy") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _E.botBuy = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botadvance") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } global.CoopMore.botAdv = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botsettings") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } global.CoopMore.botSet = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-mask") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } global.CoopCfg.mask = clamp(coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0), 0, 2); global.CoopCfg.loaded = true; }
     }
 }
 
@@ -68,6 +70,7 @@ function coop_cfg_load()
     _g.specReward = ini_read_real("coop", "specreward", 100);
     _g.mask = clamp(ini_read_real("coop", "mask", 0), 0, 2);
     _g.devMode = ini_read_real("coop", "devmode", 0) != 0;
+    _g.cchar = ini_read_string("coop", "char", "");
     ini_close();
     _g.loaded = true;
     coop_cfg_apply("load");
@@ -84,13 +87,14 @@ function coop_cfg_save()
     }
     ini_write_real("coop", "mask", _g.mask);
     ini_write_real("coop", "devmode", _g.devMode ? 1 : 0);
+    ini_write_string("coop", "char", _g.cchar);
     ini_close();
 }
 
 function coop_cfg_msg()
 {
     var _g = global.CoopCfg;
-    return { t: "cfg", repel: _g.repel, revives: _g.revives, jd: _g.jd, bossShared: _g.bossShared, maze: _g.maze, specReward: _g.specReward, mask: _g.mask,
+    return { t: "cfg", repel: _g.repel, revives: _g.revives, jd: _g.jd, bossShared: _g.bossShared, maze: _g.maze, specReward: _g.specReward, mask: _g.mask, cchar: _g.cchar,
         diff: variable_global_exists("Difficulty") ? global.Difficulty : -1 };
 }
 
@@ -117,6 +121,7 @@ function coop_set_options()
         "Spectator reward: " + string(_g.specReward) + "%" + _h,
         "My mask: " + string_upper(coop_mask_name(_g.mask)) + ((_g.partnerMaskRaw >= 0 && coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw) != _g.mask) ? " (same as P1 -> shown " + string_upper(coop_mask_name(coop_mask_shown(coop_my_slot(), _g.mask, _g.partnerMaskRaw))) + ")" : ""),
         "Developer mode: " + (_g.devMode ? "ON" : "OFF"),
+        "Character: " + ((_g.cchar == "") ? "MASK (default)" : string_upper(_g.cchar)) + ((_g.partnerChar != "") ? "  | partner: " + string_upper(_g.partnerChar) : ""),
         "Back"
     ];
 }
@@ -124,10 +129,11 @@ function coop_set_options()
 function coop_set_desc()
 {
     var _g = global.CoopCfg;
-    var _s = "Co-op settings. Host decides for both;\nyour mask and developer mode are local.";
-    if (_g.devMode) { _s += "\nDeveloper mode shows spectator stream diagnostics."; }
-    if (coop_is_client()) { _s += "\nConnected: values come from the host."; }
-    if (variable_global_exists("Difficulty")) { _s += "\nDifficulty (shared, host save): " + string(global.Difficulty); }
+    // 0.7.7 (S9-1): at most 3 header lines, so the rows above the cursor have room below it
+    var _s = "Co-op settings. Host decides for both;\n" + (_g.devMode ? "mask, dev mode (stream stats ON): local." : "your mask and developer mode are local.");
+    // 0.7.7 (S9-2): the client shows the host's synced value, not its own save's (the title screen reloads the client save)
+    if (coop_is_client()) { _s += "\nFrom host. Difficulty (shared): " + ((_g.hostDiff >= 0) ? string(_g.hostDiff) : "waiting..."); }
+    else if (variable_global_exists("Difficulty")) { _s += "\nDifficulty (shared, host save): " + string(global.Difficulty); }
     return _s;
 }
 
@@ -144,8 +150,9 @@ function coop_set_select()
         case 3: _g.bossShared = !_g.bossShared; break;
         case 4: _g.maze = !_g.maze; break;
         case 5: _g.specReward = (_g.specReward == 100) ? 50 : ((_g.specReward == 50) ? 0 : 100); break;
-        case 6: _g.mask = (_g.mask + 1) mod 3; break;
+        case 6: _g.mask = (_g.mask + 1) mod 3; if (_g.partnerMaskRaw >= 0 && _g.mask == _g.partnerMaskRaw) { _g.mask = (_g.mask + 1) mod 3; } break; // 0.7.3: never the partner's skin (same difficulty for both)
         case 7: _g.devMode = !_g.devMode; break;
+        case 8: _g.cchar = coop_char_next(_g.cchar, _g.partnerChar); global.CoopArt.spr = {}; break;
         default: goto_menu("Co-op", 4); return;
     }
     coop_cfg_save(); coop_cfg_apply("menu"); coop_cfg_send();
@@ -154,12 +161,33 @@ function coop_set_select()
 
 function coop_set_back() { goto_menu("Co-op", 4); }
 
+// 0.7.7 (S9-1), oTitleMenu Draw_77 scope: in Co-op Settings, an option row scrolled up into the header text
+// (CurrentDesc, drawn from y=16) is not drawn. The selected row (resting at y=168) always stays visible.
+function coop_set_row_visible(_y, _i)
+{
+    if (CurMenu != "Co-op Settings" || _i == SelectedOption) { return true; }
+    var _top = min(16 + string_height_ext(CurrentDesc, 32, 612) + 6, 160);
+    return _y >= _top;
+}
+
 // ---------------- runtime art (drafts) ----------------
 function coop_art_get(_slot, _mask, _kind)
 {
     var _A = global.CoopArt;
     var _key = "P" + string(_slot) + "_" + coop_mask_name(clamp(_mask, 0, 2)) + "_" + _kind;
     if (variable_struct_exists(_A.spr, _key)) { return variable_struct_get(_A.spr, _key); }
+    // 0.7.4: custom character (ready set or Addons/CoopChars/<id>/{portrait,maze,icon}.png)
+    var _ch = (_slot == coop_my_slot()) ? global.CoopCfg.cchar : global.CoopCfg.partnerChar;
+    if (_ch != "")
+    {
+        var _cf = coop_char_dir(_ch) + ((_kind == "bill") ? "maze" : _kind) + ".png";
+        if (file_exists(_cf))
+        {
+            var _cs = sprite_add(_cf, (_kind == "bill") ? 6 : 1, false, false, 0, 0);
+            if (_cs >= 0 && _kind == "bill" && (sprite_get_number(_cs) != 6 || sprite_get_height(_cs) != 64)) { coop_log("CHAR: " + _cf + " must be 6 frames of 32x64 (192x64 strip)"); sprite_delete(_cs); _cs = -1; }
+            if (_cs >= 0) { coop_log("CHAR: loaded " + _cf); variable_struct_set(_A.spr, _key, _cs); return _cs; }
+        }
+    }
     var _f = working_directory + "coop_art/" + _key + ".png";
     var _s = -1;
     if (file_exists(_f))
@@ -228,17 +256,24 @@ function coop_more_packet(_t, _m)
     var _g = global.CoopCfg, _B = global.CoopB, _M = global.CoopM, _E = global.CoopE;
     switch (_t)
     {
+        case "salv": coop_salv_in(_m); break;
         case "cfg":
             _g.partnerMaskRaw = clamp(_m.mask, 0, 2); // never our own mask
+            var _pc = variable_struct_exists(_m, "cchar") ? string(_m.cchar) : "";
+            if (_pc != _g.partnerChar) { _g.partnerChar = _pc; global.CoopArt.spr = {}; coop_log("CHAR: partner character " + ((_pc == "") ? "default" : _pc)); }
+            if (coop_is_client() && _g.cchar != "" && _g.cchar == _pc) { _g.cchar = coop_char_next(_g.cchar, _pc); global.CoopArt.spr = {}; coop_log("CHAR: same character as the host -> mine is now " + _g.cchar); coop_send(coop_cfg_packet_safe()); }
+            if (coop_is_client() && _g.mask == _g.partnerMaskRaw) { _g.mask = (_g.mask + 1) mod 3; coop_log("SKIN: same skin as the host -> mine is now " + coop_mask_name(_g.mask)); coop_send(coop_cfg_packet_safe()); }
             if (coop_is_client())
             {
                 _g.repel = _m.repel; _g.revives = _m.revives; _g.jd = _m.jd; _g.bossShared = _m.bossShared; _g.maze = _m.maze; _g.specReward = _m.specReward; _g.fromHost = true;
+                if (_m.diff >= 0) { _g.hostDiff = _m.diff; }
                 if (_m.diff >= 0 && variable_global_exists("Difficulty") && global.Difficulty != _m.diff) { coop_log("ECON: difficulty " + string(global.Difficulty) + " -> host " + string(_m.diff) + " (one difficulty for both)"); global.Difficulty = _m.diff; }
             }
             coop_cfg_apply("from partner");
             if (instance_exists(oTitleMenu)) { with (oTitleMenu) { if (CurMenu == "Co-op Settings") { CurrentOptions = coop_set_options(); CurrentDesc = coop_set_desc(); } } }
             return true;
         case "bdmg": // host: partner damaged the boss
+            if (coop_is_host() && !instance_exists(oSalvage) && global.CoopS.spec) { _B.deadDmg += _m.d; return true; } // 0.8.1: I am dead, kept for my revive
             if (coop_is_host() && instance_exists(oSalvage))
             {
                 _B.dmgIn += _m.d;
@@ -259,14 +294,17 @@ function coop_more_packet(_t, _m)
             coop_boss_aggro(_m.why, false);
             return true;
         case "stasks": // client: host's Scraptrap task list (same titles/durations on both sides)
-            if (coop_is_client() && instance_exists(oScraptrap)) { _B.scrapGotAt = current_time; oScraptrap.Tasks = _m.tasks; _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list from host (" + string(array_length(_m.tasks)) + " tasks)"); }
+            if (coop_is_client() && instance_exists(oScraptrap)) { _B.scrapGotAt = current_time; oScraptrap.Tasks = _m.tasks; _B.scrapTotal = array_length(_m.tasks); _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list from host (" + string(array_length(_m.tasks)) + " tasks)"); }
             return true;
         case "stask": // partner finished a task
             _B.scrapIn++;
             coop_scrap_remove(_m.title);
+            // 0.8.3 (UX-S16-S1): short toast with the task's name instead of a permanent egocentric counter
+            if (room == Office && instance_exists(oScraptrap)) { coop_alert("Partner finished: " + string(_m.title), c_yellow, undefined); }
             return true;
         case "mz": // partner maze position
             _M.px = _m.x; _M.py = _m.y; _M.pdir = _m.d; _M.pmove = _m.mv; _M.pAlive = _m.al && !(current_time - _M.pCaughtAt < 2000); _M.prm = _m.rm; _M.pAt = current_time;
+            var _ps = variable_struct_exists(_m, "s") ? _m.s : 0; if (_ps != _M.psit) { coop_log("MAZE: partner " + (_ps ? "sat down" : "stood up")); } _M.psit = _ps;
             return true;
         case "mzen": // client: host's enemy states
             _M.enemies = _m.e; _M.enemiesAt = current_time;
@@ -312,9 +350,12 @@ function coop_boss_step()
 {
     var _B = global.CoopB, _c = global.Coop;
     if (!_c.connected || room != Office || !global.CoopCfg.bossShared) { _B.lastHP = -1; return; }
+    coop_boss_roles_step(); // 0.8.0 (215-boss): roles change damage / pushback (before the HP delta below)
+    coop_boss_restore_step(); // 0.8.1 (S13-2): after a revive, once the new Salvage exists
     if (instance_exists(oSalvage))
     {
         var _hp = oSalvage.HP;
+        if (coop_is_host()) { _B.hpKeep = _hp; }
         if (coop_is_client())
         {
             if (_B.lastHP >= 0 && _hp < _B.lastHP - 0.00001) { var _d = _B.lastHP - _hp; _B.dmgOut += _d; coop_send({ t: "bdmg", d: _d }); }
@@ -379,8 +420,8 @@ function coop_scrap_remove(_title)
 function coop_scrap_step()
 {
     var _B = global.CoopB;
-    if (!instance_exists(oScraptrap)) { _B.scrapSent = false; _B.scrapTitles = []; return; }
-    if (coop_is_host() && !_B.scrapSent) { _B.scrapSent = true; coop_send({ t: "stasks", tasks: oScraptrap.Tasks }); _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list sent (" + string(array_length(_B.scrapTitles)) + ")"); return; }
+    if (!instance_exists(oScraptrap)) { _B.scrapSent = false; _B.scrapTitles = []; _B.scrapTotal = 0; return; }
+    if (coop_is_host() && !_B.scrapSent) { _B.scrapSent = true; _B.scrapTotal = array_length(oScraptrap.Tasks); coop_send({ t: "stasks", tasks: oScraptrap.Tasks }); _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list sent (" + string(array_length(_B.scrapTitles)) + ")"); return; }
     var _now = coop_scrap_titles();
     if (array_length(_now) < array_length(_B.scrapTitles))
     {
@@ -490,7 +531,9 @@ function coop_maze_step()
     {
         _M.lastSend = current_time;
         var _cam = oCamera3DMaze;
-        coop_send({ t: "mz", x: _cam.x, y: _cam.y, d: _cam.CameraRotationH + 180, mv: (_cam.Loudness > 0) ? 1 : 0, al: !_M.meCaught && !instance_exists(oMinigameJumpscare), rm: room_get_name(room) });
+        var _ms = coop_maze_me_sitting();
+        if (_ms != _M.sitLog) { if (_M.sitLog != -1 || _ms) { coop_log("MAZE: my pose -> " + (_ms ? "sitting" : "standing") + " (sent to partner)"); } _M.sitLog = _ms; }
+        coop_send({ t: "mz", s: _ms, x: _cam.x, y: _cam.y, d: _cam.CameraRotationH + 180, mv: (_cam.Loudness > 0) ? 1 : 0, al: !_M.meCaught && !instance_exists(oMinigameJumpscare), rm: room_get_name(room) });
     }
     // host ghost: run the normal death once the partner is out of the maze or caught
     if (_M.ghost && !_M.ghostDone && (!_M.sync || !_M.pAlive)) { _M.ghostDone = true; coop_maze_die_local("deferred: partner out of the maze or caught"); }
@@ -607,8 +650,10 @@ function coop_maze_peer_draw()
     var _wf = _M.pmove ? (1 + ((current_time div 180) mod 2)) : 0;
     var _sub = (_front ? 0 : 3) + _wf;
     var _uv = sprite_get_uvs(_spr, _sub);
-    var _x1 = x - lengthdir_x(24, _va), _y1 = y - lengthdir_y(24, _va), _x2 = x + lengthdir_x(24, _va), _y2 = y + lengthdir_y(24, _va);
-    var _H = 96;
+    // 0.7.3: sitting partner = lower, slightly wider billboard (feet stay on the floor)
+    var _hw = _M.psit ? 27 : 24;
+    var _x1 = x - lengthdir_x(_hw, _va), _y1 = y - lengthdir_y(_hw, _va), _x2 = x + lengthdir_x(_hw, _va), _y2 = y + lengthdir_y(_hw, _va);
+    var _H = _M.psit ? 58 : 96;
     shader_set(TransparencyShader);
     var _vb = vertex_create_buffer();
     vertex_begin(_vb, global.VertexFormat);
@@ -660,16 +705,17 @@ function coop_spec_reward(_before)
 function coop_econ_draw()
 {
     var _E = global.CoopE, _c = global.Coop;
-    if (!_c.connected || room == Office || room == GameOver || coop_is_maze_room(room) || room == StartupRoom || room == WarningScreen) { return; }
+    if (!_c.connected || room == Office || room == GameOver || coop_is_maze_room(room) || room == StartupRoom || room == WarningScreen || coop_sync_is_menu(room) || instance_exists(oTitleMenu)) { return; } // 0.7.6 S7-3: never over title menus / Co-op Settings
     if (_E.pMoney < 0 && array_length(_E.pBuys) == 0) { return; }
     if (room == NightOpening || instance_exists(oTextBox) || instance_exists(oTextBox_Fredbear)) { return; } // 0.6.2: not over the night card portraits / story
     var _gw = display_get_gui_width();
     var _t = "PARTNER $" + string(_E.pMoney);
     if (array_length(_E.pBuys) > 0) { _t += "  bought: "; for (var i = max(0, array_length(_E.pBuys) - 3); i < array_length(_E.pBuys); i++) { _t += _E.pBuys[i] + ((i < array_length(_E.pBuys) - 1) ? ", " : ""); } }
     var _w = string_width(_t) + 26;
-    draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw - _w - 4, 4, _gw - 4, 21, false); draw_set_alpha(1);
-    coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, _gw - _w, 5, 1);
-    draw_set_color(c_aqua); draw_text(_gw - _w + 18, 6, _t); draw_set_color(c_white);
+    var _ey = display_get_gui_height() - 40; // 0.7.5: bottom-left (top-right is the native money / Tokens box)
+    coop_ui_panel(4, _ey, 4 + _w, _ey + 17);
+    coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 7, _ey + 1, 1);
+    draw_set_color(c_aqua); draw_text(24, _ey + 2, _t); draw_set_color(c_white);
 }
 
 // ---------------- step / draw ----------------
@@ -682,13 +728,25 @@ function coop_more_step()
         if (room == Office)
         {
             _X.officeAt = current_time;
-            global.CoopF.revLeft = _g.revives;
-            if (!_g.jd) { global.CoopF.jd.done = true; }
             global.CoopA.repelChance = _g.repel;
-            _B.aggro = 0; _B.pDeadSeen = false; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
+            coop_boss_roles_enter(); // 0.8.1 (S13-1): SOLO grace on every Office entry
+            if (global.CoopF.revivedEnter)
+            {
+                // 0.8.1 (S13-2): back from a revive -> same night, same boss: keep the revive counter and the enrage level,
+                // take the shared boss HP back (host: own last HP minus what the partner hit while I was dead)
+                global.CoopF.revivedEnter = false;
+                coop_boss_revive_enter();
+            }
+            else
+            {
+                global.CoopF.revLeft = _g.revives;
+                if (!_g.jd) { global.CoopF.jd.done = true; }
+                _B.aggro = 0; _B.pDeadSeen = false; _B.meDeadSeen = false; global.CoopBR.dmgAdj = 0; global.CoopBR.solo = false; global.CoopBR.winN = 0; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
+                _B.hpKeep = -1; _B.deadDmg = 0; _B.restoreHP = -1; _B.reAggro = 0;
+            }
             _E.partnerEr = -1; _E.botBuyDone = false;
         }
-        if (coop_is_maze_room(room)) { _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
+        if (coop_is_maze_room(room)) { _M.mzRoom = room; _M.mzAt = current_time; _M.botSitOn = false; _M.botSitWait = false; _M.sitLog = -1; _M.sit = false; _M.psit = 0; _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
         _X.prevRoom = room;
     }
     // money in the snapshot-free channel: send on change
@@ -747,6 +805,8 @@ function coop_more_bot()
         if (_c.connected && coop_tb_sync_room())
         {
             if (coop_is_host()) { var _l = coop_tb_list(); for (var k = 0; k < array_length(_l); k++) { if (coop_tb_can(_l[k])) { coop_tb_send_press(_l[k]); coop_tb_forward_inst(_l[k]); break; } } }
+            // 0.7.3 bot only: a client box the host never shows (different story flags in the test save) would block the client bot forever
+            else if (_M.botFace >= 0 && current_time - global.CoopS3.mzIn > 25000) { coop_bot_textbox_forward(); }
         }
         else { coop_bot_textbox_forward(); }
     } }
@@ -822,31 +882,149 @@ function coop_more_draw()
     var _gw = display_get_gui_width(), _salvage = instance_find(oSalvage, 0), _scraptrap = instance_find(oScraptrap, 0);
     if (room == Office && _c.connected && _salvage != noone && global.CoopCfg.bossShared)
     {
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw / 2 - 70, 48, _gw / 2 + 70, 62, false); draw_set_alpha(1);
+        coop_ui_panel(_gw / 2 - 70, 48, _gw / 2 + 70, 62);
         draw_set_color(c_red); draw_set_halign(fa_center); draw_text(_gw / 2, 49, "SHARED BOSS HP " + string(max(0, round(_salvage.HP))) + "%  P" + string(_salvage.Phase) + (_B.aggro > 0 ? "  RAGE " + string(_B.aggro) : "")); draw_set_halign(fa_left);
     }
-    if (room == Office && _c.connected && _scraptrap != noone)
+    // 0.8.3 (UX-S16-S1/S2): one shared progress line, identical on both sides (total = list size when the host sent /
+    // the client received the task list, left = shared remaining tasks); only once the list was synced this night.
+    // Note: oScraptrap itself is spawned by the vanilla AI setup (e.g. Unlock All on Night 1), the mod does not add spawns.
+    if (room == Office && _c.connected && _scraptrap != noone && _B.scrapTotal > 0)
     {
         var _ty = (_salvage != noone && global.CoopCfg.bossShared) ? 64 : 48; // below the cam strip and alert banner
         // 0.6.4 (S3-4): with the cams up, centre it over the camera view (right of the cam map and clear of its corner marks)
         var _tx = (variable_global_exists("CamUp") && global.CamUp) ? round(_gw * 0.6875) : _gw / 2;
-        var _tt = "SCRAPTRAP: " + string(array_length(_scraptrap.Tasks)) + " tasks left | partner finished " + string(_B.scrapIn), _tw = string_width(_tt) / 2 + 4;
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_tx - _tw, _ty, _tx + _tw, _ty + 14, false); draw_set_alpha(1);
+        var _left = array_length(_scraptrap.Tasks), _tot = max(_B.scrapTotal, _left);
+        var _tt = "SCRAPTRAP  done " + string(_tot - _left) + "/" + string(_tot) + "  (" + string(_left) + " left)", _tw = string_width(_tt) / 2 + 4;
+        coop_ui_panel(_tx - _tw, _ty, _tx + _tw, _ty + 14);
         draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_tx, _ty + 1, _tt); draw_set_halign(fa_left);
     }
     var _mazeCam = instance_find(oCamera3DMaze, 0);
     if (coop_is_maze_room(room) && _c.connected && _mazeCam != noone)
     {
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(4, 24, 190, 42, false); draw_set_alpha(1);
-        coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 6, 25, 1);
+        coop_ui_panel(4, 4, 190, 22); // 0.7.5: top-left corner is free in the maze (money box is top-right)
+        coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 6, 5, 1);
         draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
-        if (_M.ghost && !_M.ghostDone) { draw_set_color(c_red); draw_text(6, 46, "CAUGHT - you are a ghost until your partner leaves the maze"); }
+        if (_M.ghost && !_M.ghostDone) { draw_set_color(c_red); draw_text(6, 26, "CAUGHT - you are a ghost until your partner leaves the maze"); }
         draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
-        draw_text(26, 26, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(_mazeCam.x, _mazeCam.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
+        draw_text(26, 6, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(_mazeCam.x, _mazeCam.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
         draw_set_color(c_white);
+    }
+    // 0.8.3 (UX-S16-M2): ESC was refused because a dialog is open (see coop_pause_requested)
+    if (coop_is_maze_room(room) && current_time - _M.pauseBlockAt < 2500)
+    {
+        var _pt = "Finish the dialog first, then ESC to pause both games", _pw2 = string_width(_pt) / 2 + 6;
+        coop_ui_panel(_gw / 2 - _pw2, 26, _gw / 2 + _pw2, 41);
+        draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_gw / 2, 27, _pt); draw_set_halign(fa_left); draw_set_color(c_white);
     }
     if (room == SalvageResults && _M.waitShown)
     {
         draw_set_halign(fa_center); draw_set_color(c_yellow); draw_text(_gw / 2, 100, "Waiting for your partner to leave the maze..."); draw_set_halign(fa_left); draw_set_color(c_white);
     }
 }
+
+
+// ================= 0.7.3: sit / crouch in the 3D maze =================
+// Patched into oCamera3DMaze Step: Crouching = (coop_maze_crouch(<original Sneak hold>) && no lock-on).
+// C or Ctrl toggles sitting; the original held Sneak key still works. Uses the original crouch height / walls.
+function coop_maze_crouch(_held)
+{
+    var _M = global.CoopM;
+    if (!instance_exists(oTextBox) && (keyboard_check_pressed(ord("C")) || keyboard_check_pressed(vk_control)))
+    {
+        _M.botSitOn = false; // 0.7.7 (S9-3): a manual C/Ctrl takes over; the bot timer never cancels it
+        coop_maze_set_sit(!_M.sit, "C/Ctrl");
+    }
+    // 0.7.7 (S9-3): the bot sit only starts once the maze room was entered (oCoopNet saw it) and has been up for 1 s,
+    // the delay counts from that entry, and only the bot's own sit is ended by the bot.
+    if (_M.botSit >= 0 && instance_exists(oCamera3DMaze) && coop_is_maze_room(room) && _M.mzRoom == room && current_time - _M.mzAt >= 1000)
+    {
+        var _sec = (current_time - _M.mzAt) / 1000;
+        // 0.7.8 (S10-1): the game only crouches when nothing is locked on (LockOnTarget == -4) and C/Ctrl only works with no
+        // dialog open; the maze opens with a dialog/lock-on, so the forced sit used to flip _M.sit while the pose (and the
+        // "s" sent to the partner) stayed standing. The bot now waits for the same conditions and goes through coop_maze_set_sit.
+        var _free = !instance_exists(oTextBox) && !instance_exists(oMinigameJumpscare) && oCamera3DMaze.LockOnTarget == -4;
+        if (!_M.botSitDone && _sec >= max(1, _M.botSit))
+        {
+            if (!_free)
+            {
+                if (!_M.botSitWait) { _M.botSitWait = true; _M.botSitWaitAt = current_time; coop_log("bot: sit waits for dialog / lock-on to end"); }
+                // like -coop-botlook (0.6.4): a dialog nobody closes (opening NPC) is closed 5 s later, bot flag only
+                else if (instance_exists(oTextBox) && !instance_exists(oMinigameJumpscare) && current_time - _M.botSitWaitAt > 5000) { coop_log("bot: dialog still open -> closed for -coop-botsit"); with (oTextBox) { instance_destroy(); } _M.botSitWaitAt = current_time; }
+            }
+            else if (_M.sit) { _M.botSitDone = true; coop_log("bot: already sitting (manual), -coop-botsit skipped"); }
+            else { _M.botSitDone = true; _M.botSitOn = true; _M.botSitUntil = current_time + 15000; coop_log("bot: FORCED sit for 15 s (-coop-botsit)"); coop_maze_set_sit(true, "bot"); }
+        }
+        else if (_M.botSitOn && current_time > _M.botSitUntil) { _M.botSitOn = false; coop_log("bot: stand up"); coop_maze_set_sit(false, "bot"); }
+        if (_M.botSitDone && !_M.sitShot && current_time > _M.botSitUntil - 7000) { _M.sitShot = true; global.CoopMore.shotReq = "maze_sit"; global.CoopMore.shotAt = current_time; }
+    }
+    return _held || _M.sit;
+}
+
+// 0.7.8 (S10-1): the one path for every sit/stand (C/Ctrl and -coop-botsit): flag, log, and an immediate "mz" to the partner
+function coop_maze_set_sit(_on, _why)
+{
+    var _M = global.CoopM;
+    if (_M.sit == _on) { return; }
+    _M.sit = _on;
+    _M.lastSend = 0; // next coop_maze_step sends "mz" right away (s follows the real pose, see coop_maze_me_sitting)
+    coop_log("MAZE: I " + (_on ? "sat down" : "stood up") + " (" + _why + ")");
+}
+
+function coop_maze_me_sitting()
+{
+    if (!instance_exists(oCamera3DMaze)) { return 0; }
+    var _c = oCamera3DMaze;
+    return (_c.HeightOffset < (_c.CustomHeight + _c.CustomSneakHeight) / 2) ? 1 : 0;
+}
+
+// ===== 0.7.3: maze salvage pick is shared WITHOUT the cutscene (partner gets the same animatronic + an icon top-right) =====
+global.CoopSalv = { icon: -1, iconAt: 0, inN: 0, outN: 0 };
+function coop_cfg_packet_safe() { return { t: "cfg", repel: global.CoopCfg.repel, revives: global.CoopCfg.revives, jd: global.CoopCfg.jd, bossShared: global.CoopCfg.bossShared, maze: global.CoopCfg.maze, specReward: global.CoopCfg.specReward, mask: global.CoopCfg.mask, cchar: global.CoopCfg.cchar, diff: -1 }; }
+function coop_salv_out(_id)
+{
+    if (!global.Coop.connected || !coop_is_maze_room(room)) { return; }
+    global.CoopSalv.outN++;
+    coop_send({ t: "salv", id: _id });
+    coop_log("SALV: I salvaged " + string(_id) + " -> partner gets it (no cutscene)");
+}
+function coop_salv_in(_m)
+{
+    var _id = real(_m.id);
+    if (!variable_global_exists("SalvagesCurrent") || array_contains(global.SalvagesCurrent, _id)) { coop_log("SALV: partner salvaged " + string(_id) + " (already mine)"); return; }
+    array_push(global.SalvagesCurrent, _id);
+    array_push(global.AllTimeSalvages, _id);
+    global.SalvageRecord[_id]++;
+    with (oInteraction_Animatronic) { if (variable_instance_exists(id, "AnimatronicID") && AnimatronicID == _id) { Text = "Destroy"; } }
+    global.CoopSalv.icon = _id; global.CoopSalv.iconAt = current_time; global.CoopSalv.inN++;
+    coop_log("SALV: partner salvaged " + string(_id) + " -> added here silently (" + string(array_length(global.SalvagesCurrent)) + "/" + string(global.SalvageQuota) + ")");
+}
+function coop_salv_draw()
+{
+    var _S = global.CoopSalv;
+    if (_S.icon < 0 || current_time - _S.iconAt > 6000 || !coop_is_maze_room(room)) { return; }
+    var _gw = display_get_gui_width(), _t = "PARTNER SALVAGED  " + string(array_length(global.SalvagesCurrent)) + "/" + string(global.SalvageQuota);
+    var _w = string_width(_t) + 12;
+    var _py = 44; // 0.7.5: below the native money box; 0.7.7 (S9-5): text follows the box (was still at y=27, over the money box)
+    coop_ui_panel(_gw - _w - 4, _py, _gw - 4, _py + 16);
+    draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(make_color_rgb(244, 240, 232)); draw_text(_gw - _w + 2, _py + 2, _t); draw_set_color(c_white);
+}
+
+// ---------------- 0.7.4: custom characters ----------------
+function coop_char_dir(_id) { return working_directory + "Addons/CoopChars/" + _id + "/"; }
+function coop_char_list()
+{
+    var _l = [""];
+    var _f = file_find_first(working_directory + "Addons/CoopChars/*", fa_directory);
+    while (_f != "") { if (_f != "." && _f != ".." && file_exists(coop_char_dir(_f) + "portrait.png")) { array_push(_l, _f); } _f = file_find_next(); }
+    file_find_close();
+    return _l;
+}
+function coop_char_next(_cur, _partner)
+{
+    var _l = coop_char_list(), _n = array_length(_l), _i = 0;
+    for (var k = 0; k < _n; k++) { if (_l[k] == _cur) { _i = k; } }
+    for (var k = 1; k <= _n; k++) { var _c = _l[(_i + k) mod _n]; if (_c == "" || _c != _partner) { return _c; } }
+    return "";
+}
+
+// 0.7.4 boss roles panel moved to CoopBoss (0.8.0: real role mechanics)

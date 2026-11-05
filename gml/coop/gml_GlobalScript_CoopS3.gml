@@ -25,10 +25,11 @@ function coop_s3_parse_args()
     for (var i = 0; i < _n; i++)
     {
         var _p = parameter_string(i), _v = (i + 1 < _n) ? parameter_string(i + 1) : "";
-        if (_p == "-coop-botmazelook") { i++; _S.lookT = real(_v); }
-        else if (_p == "-coop-botbossreal") { i++; _S.bossReal = real(_v); }
+        if (_p == "-coop-botmazelook") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.lookT = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botbossreal") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.bossReal = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
         else if (_p == "-coop-botending") { i++; _S.ending = string_lower(_v); }
-        else if (_p == "-coop-botbosswin") { i++; _S.bossWin = real(_v); }
+        else if (_p == "-coop-botbosswin") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.bossWin = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botsit") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } global.CoopM.botSit = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
     }
 }
 
@@ -197,7 +198,7 @@ function coop_hd_draw()
     var _t = "SHARED: LEVEL " + string(_lv) + "/5" + ((current_time - _S.pHdAt < 5000) ? "  (P" + string(coop_partner_slot()) + " LEVEL " + string(_S.pHdLv) + ")" : "");
     draw_set_halign(fa_left); draw_set_valign(fa_top);
     var _w = string_width(_t) + 8;
-    draw_set_alpha(0.65); draw_set_color(c_black); draw_rectangle(4, 48, 4 + _w, 62, false); draw_set_alpha(1);
+    coop_ui_panel(4, 48, 4 + _w, 62);
     draw_set_color(make_color_rgb(244, 240, 232)); draw_text(8, 49, _t); draw_set_color(c_white);
 }
 
@@ -261,6 +262,7 @@ function coop_maze_look_step()
 function coop_maze_tb_open(_key, _px, _py)
 {
     var _c = global.Coop;
+    return; // 0.7.3: maze dialogs / shop are LOCAL (only the player who started them sees them)
     if (!_c.connected || !global.CoopCfg.maze || !coop_is_maze_room(room)) { return; }
     coop_send({ t: "mztb", k: _key, rm: room_get_name(room), qx: _px, qy: _py });
     coop_log("MAZE: I opened dialog '" + string(_key) + "' -> partner sees it too");

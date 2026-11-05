@@ -1,5 +1,7 @@
 // Applies the coop mod to a CLEAN data.win loaded by UndertaleModCli.
-// Env: COOP_MOD_DIR (mod repo root), COOP_STAGE = noop | log | full, COOP_CHEATS = 0 | 1
+// Env: COOP_MOD_DIR (mod repo root), COOP_STAGE = noop | log | full | overlay, COOP_CHEATS = 0 | 1
+// overlay = re-import the co-op scripts into an already co-op-patched 2.1.5 data.win (no clean 2.1.5 base on the build box);
+//           vanilla hooks are NOT re-applied there (they are already in the base), only hooks new since 0.7.2 (idempotent).
 using System;
 using System.IO;
 using System.Linq;
@@ -9,12 +11,16 @@ EnsureDataLoaded();
 string modDir = Environment.GetEnvironmentVariable("COOP_MOD_DIR");
 string stage = Environment.GetEnvironmentVariable("COOP_STAGE") ?? "full";
 bool adminCheats = Environment.GetEnvironmentVariable("COOP_CHEATS") == "1";
+// 0.7.7 (S9-6): COOP_UNLOCKALL=1 when building the Unlock_All_Install data.win -> co-op saves default to _coop_unlockall
+bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
 if (modDir == null) throw new Exception("COOP_MOD_DIR not set");
-Console.WriteLine($"[apply] stage={stage} adminCheats={adminCheats} game={Data.GeneralInfo.DisplayName.Content}");
+Console.WriteLine($"[apply] stage={stage} adminCheats={adminCheats} unlockBuild={unlockBuild} game={Data.GeneralInfo.DisplayName.Content}");
 if (stage == "noop") { Console.WriteLine("[apply] noop: resave only"); return; }
 
 var dirs = new System.Collections.Generic.List<string> { Path.Combine(modDir, "gml", "boot") };
-if (stage == "full") dirs.Add(Path.Combine(modDir, "gml", "coop"));
+bool overlay = stage == "overlay";
+if (stage == "full" || overlay) dirs.Add(Path.Combine(modDir, "gml", "coop"));
+if (overlay) dirs.Add(Path.Combine(modDir, "gml", "compat215"));
 if (stage == "full" && adminCheats) dirs.Add(Path.Combine(modDir, "gml", "admin"));
 
 // v2.1.5 changed several vanilla code bodies; verify the resulting hooks with tests/verify.csx
@@ -58,7 +64,7 @@ if (stage == "full")
         g.QueueFindReplace(pz, "|| !window_has_focus())", "|| (!window_has_focus() && !coop_active()))");
         g.QueueFindReplace(pz, "instance_activate_object(oSuperGameManager);", "instance_activate_object(oSuperGameManager);\n    instance_activate_object(oCoopNet);");
         g.QueueFindReplace(pz, "input_check_pressed(UnknownEnum.Value_1) && !Cooldown",
-            "(input_check_pressed(UnknownEnum.Value_1) && !Cooldown) || coop_pause_requested()");
+            "coop_pause_requested(input_check_pressed(UnknownEnum.Value_1) && !Cooldown)");
         g.QueueFindReplace(pz, "    Paused = true;", "    coop_pause_on_open();\n    Paused = true;");
         g.QueueFindReplace(pz, "    Paused = false;", "    coop_pause_on_close();\n    Paused = false;");
     }
@@ -125,10 +131,36 @@ if (stage == "full")
     g.QueueFindReplace("gml_Object_oGameOver_Draw_0", "format_as_timer(min(global.TimeOfDeath, 359.99), true);", "format_as_timer(min(coop_tod(), 359.99), true);");
 }
 
+// 0.7.3: sit/crouch toggle (C / Ctrl) in the 3D maze, via the original Sneak (Freeroam) crouch
+{
+    string mz = "gml_Object_oCamera3DMaze_Step_0";
+    string mzFind = "var Crouching = (input_check(UnknownEnum.Value_26) && LockOnTarget == -4)";
+    // no decompile here: a GlobalDecompileContext built before Import() freezes the global function table
+    if (stage == "full" || overlay)
+        g.QueueFindReplace(mz, mzFind, "var Crouching = (coop_maze_crouch(input_check(UnknownEnum.Value_26)) && LockOnTarget == -4)");
+}
+if (stage == "full" || overlay)
+{
+    // 0.7.3: maze salvage -> partner gets it silently
+    g.QueueFindReplace("gml_GlobalScript_TextboxScripts", "array_push(global.SalvagesCurrent, other.SalvageID);", "array_push(global.SalvagesCurrent, other.SalvageID);\n                coop_salv_out(other.SalvageID);");
+}
+if (stage == "full" || overlay)
+{
+    // 0.7.7 (S9-1): Co-op Settings rows scrolled up into the header (CurrentDesc) are not drawn
+    g.QueueFindReplace("gml_Object_oTitleMenu_Draw_77",
+        "        draw_text((624 - XOffset[i]) + SetXOffset, (16 + (40 * i)) - YOffset, CurrentOptions[i]);",
+        "        if (coop_set_row_visible((16 + (40 * i)) - YOffset, i)) { draw_text((624 - XOffset[i]) + SetXOffset, (16 + (40 * i)) - YOffset, CurrentOptions[i]); }");
+}
+if ((stage == "full" || overlay) && unlockBuild)
+{
+    // 0.7.7 (S9-6): the Unlock All build behaves like -coop-unlockall without the flag; -coop-savetag X still overrides the tag
+    g.QueueFindReplace("gml_Object_oCoopNet_Create_0", "coop_parse_args();",
+        "global.CoopF.unlockBuild = true;\nglobal.CoopF.unlockAll = true;\nif (global.CoopF.saveTagArg == \"\") { global.CoopF.saveTagArg = \"_unlockall\"; }\ncoop_parse_args();");
+}
 var res = g.Import();
 Console.WriteLine("[apply] import done");
 
-if (stage == "full")
+if (stage == "full" || overlay)
 {
     var o = Data.GameObjects.ByName("oCoopNet");
     if (o == null) throw new Exception("oCoopNet not created");

@@ -25,10 +25,10 @@ function coop_sync_parse_args()
         var _p = parameter_string(i);
         var _v = (i + 1 < _n) ? parameter_string(i + 1) : "";
         if (_p == "-coop-botmenu") { i++; _S.botMenu = _v; }              // FLAGGED test bot: new[:diff] | cont | custom | extras | endless | 4ld
-        else if (_p == "-coop-botmenuat") { i++; _S.botMenuAt = real(_v); } // ms after the main menu appears
-        else if (_p == "-coop-botpress") { i++; _S.botPress = real(_v); }   // FLAGGED: "press" the dialog key every N ms (same path as a real key press)
-        else if (_p == "-coop-botpressmax") { i++; _S.botPressMax = real(_v); }
-        else if (_p == "-coop-botquit") { i++; _S.botQuit = real(_v); }      // FLAGGED: quit to menu after N s in the Office
+        else if (_p == "-coop-botmenuat") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.botMenuAt = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); } // ms after the main menu appears
+        else if (_p == "-coop-botpress") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.botPress = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }   // FLAGGED: "press" the dialog key every N ms (same path as a real key press)
+        else if (_p == "-coop-botpressmax") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.botPressMax = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botquit") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.botQuit = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }      // FLAGGED: quit to menu after N s in the Office
     }
 }
 
@@ -264,28 +264,32 @@ function coop_tb_can(_i)
 }
 
 // one forward press on ONE textbox (same as oTextBox draw_everything with ForwardKey)
+// 0.6.6@2.1.5 (user build): `return` inside with() is miscompiled by UTMT -> run the body as a bound method instead
+function coop_tb_forward_self()
+{
+    if (TextDrawChar != TextLength[TextPage]) { TextDrawChar = TextLength[TextPage]; return "reveal"; }
+    if (TextPage < (TextPageNumber - 1))
+    {
+        if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; audio_play_sound(sfxCamSwitch, 5, false); initialize(); var _boundGameText = method(id, game_text); _boundGameText(_dst); }
+        TextPage += 1; TextDrawChar = 0;
+        if (is_callable(Function[TextPage])) { Function[TextPage](); }
+        if (array_length(CGPFunction) > 0 && TextPage < array_length(CGPFunction))
+        {
+            var _f = CGPFunction[TextPage];
+            if (array_length(_f) == 1) { _f[0](); } else if (array_length(_f) > 1) { _f[0](_f[1]); }
+        }
+        Frame = 0;
+        return "adv";
+    }
+    instance_destroy();
+    return "end";
+}
+
 function coop_tb_forward_inst(_i)
 {
-    with (_i)
-    {
-        if (TextDrawChar != TextLength[TextPage]) { TextDrawChar = TextLength[TextPage]; return "reveal"; }
-        if (TextPage < (TextPageNumber - 1))
-        {
-            if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; audio_play_sound(sfxCamSwitch, 5, false); initialize(); var _boundGameText = method(id, game_text); _boundGameText(_dst); }
-            TextPage += 1; TextDrawChar = 0;
-            if (is_callable(Function[TextPage])) { Function[TextPage](); }
-            if (array_length(CGPFunction) > 0 && TextPage < array_length(CGPFunction))
-            {
-                var _f = CGPFunction[TextPage];
-                if (array_length(_f) == 1) { _f[0](); } else if (array_length(_f) > 1) { _f[0](_f[1]); }
-            }
-            Frame = 0;
-            return "adv";
-        }
-        instance_destroy();
-        return "end";
-    }
-    return "";
+    if (!instance_exists(_i)) { return ""; }
+    var _forward = method(_i, coop_tb_forward_self);
+    return _forward();
 }
 
 function coop_tb_list()
@@ -297,7 +301,7 @@ function coop_tb_list()
 }
 
 // 0.6.3: maze dialogs are shared too (opened for both by coop_maze_tb_open, pages turned by either player)
-function coop_tb_sync_room() { return room != Office && (!coop_is_maze_room(room) || (variable_global_exists("CoopCfg") && global.CoopCfg.maze)); }
+function coop_tb_sync_room() { return room != Office && !coop_is_maze_room(room); } // 0.7.3: maze dialogs local
 
 // a local press on a dialog: tell the partner which page and what it did (reveal / advance)
 function coop_tb_send_press(_i)
@@ -482,9 +486,9 @@ function coop_sync_draw()
     if (!(room == Office && _c.connected) && current_time - _S.noteAt < _S.noteMs) { _txt = _S.note; }
     if (_txt != "")
     {
-        var _tw = string_width(_txt) + 10, _bx = _gw / 2 - _tw / 2, _by = 26;
+        var _tw = string_width(_txt) + 10, _bx = _gw / 2 - _tw / 2, _by = _gh - 58; // 0.7.5: off menu titles (Extras / Custom Night)
         var _a = clamp((_S.noteMs - (current_time - _S.noteAt)) / 400, 0, 1);
-        draw_set_alpha(0.55 * _a); draw_set_color(c_black); draw_rectangle(_bx, _by, _bx + _tw, _by + 15, false);
+        coop_ui_panel(_bx, _by, _bx + _tw, _by + 15);
         draw_set_alpha(_a); draw_set_color(c_yellow); draw_text(_bx + 5, _by + 1, _txt);
         draw_set_alpha(1); draw_set_color(c_white);
     }
@@ -492,7 +496,7 @@ function coop_sync_draw()
     {
         var _w = "Waiting for " + coop_sync_pname() + "...";
         var _ww = string_width(_w) + 10;
-        draw_set_alpha(0.55); draw_set_color(c_black); draw_rectangle(_gw / 2 - _ww / 2, _gh - 40, _gw / 2 + _ww / 2, _gh - 25, false);
+        coop_ui_panel(_gw / 2 - _ww / 2, _gh - 40, _gw / 2 + _ww / 2, _gh - 25);
         draw_set_alpha(0.6 + 0.4 * (((current_time div 500) mod 2) == 0)); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh - 39, _w); draw_set_halign(fa_left);
         draw_set_alpha(1); draw_set_color(c_white);
     }

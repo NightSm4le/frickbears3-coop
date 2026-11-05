@@ -80,6 +80,7 @@ function coop_anim_night_start()
     if (_a.objOf[1] == -1) { coop_anim_build(); }
     for (var i = 0; i < 201; i++) { _a.tok[i] = 0; _a.granted[i] = false; _a.threat[i] = false; _a.boostAmt[i] = 0; _a.aggro[i] = 0; _a.pendAt[i] = 0; }
     _a.doorSince = -1; _a.myDc = 0; _a.genExtra = 0; _a.lastKiller = -1; _a.diedSent = false;
+    global.CoopS.armed = false; // 0.8.3: a fresh Office visit (night start / revive) is never "dying"
     _a.lureX = variable_global_exists("AudioLureX") ? global.AudioLureX : -99;
     _a.lureY = variable_global_exists("AudioLureY") ? global.AudioLureY : -99;
     _a.scanAt = -100000;

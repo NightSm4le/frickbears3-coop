@@ -1,6 +1,6 @@
 # frickbears-coop
 
-Two-player co-op mod for Five Nights at Frickbear's 3 + Four Layers Down v2.1.5 (GameMaker VM). The repository contains mod source and UndertaleModTool scripts, not the game's `data.win` or other game assets.
+Two-player co-op mod for Five Nights at Frickbear's 3 + Four Layers Down v2.1.5 (GameMaker VM). **Exactly 2 players (только 2 игрока):** one host and one friend; there is no 3-4 player mode. The repository contains mod source and UndertaleModTool scripts, not the game's `data.win` or other game assets.
 
 On Windows, build from a clean v2.1.5 `data.win` with UndertaleModTool CLI:
 

@@ -173,3 +173,38 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
 - Animatronic kills on the client now wait for a host attack-token grant; spectator streaming starts at 640x360 and is capped at two unacknowledged frames to reduce TCP head-of-line delay.
 - Office HUD labels a partner who is not using the camera/panel as `SEATED`; this is a status indicator, not a new animated player model.
 - Static build verification passed on the supplied v2.1.5 `data.win`; an in-game two-player/network test has not been run. Addon import remains 2D PNG skin conversion, not 3D model loading.
+
+## 0.8.0
+- 215-sync: gml_GlobalScript_CoopStory — host-authoritative story mirror (packets story/stup/streq; story also inside the night payload).
+  Exact from host: Route, ShuffleMode/ShuffleData, Deaths, Guard (numeric nights), UnlockedAnimatronics[128..], masks/scraps/minigames, UnlockFlags (non-CCStory), ClearedEndings, ShuffleCallsHeard.
+  Client gains in the session go up (stup) and are union-merged on the host. Client keeps its own permanent unlocks at save_permanent_data (union, then host state re-applied).
+  Not synced: shop (RunEarnings/Upgrades/CCStory_*), maze-run state, maze/menu textbox paging. Only numeric nights.
+- 215-boss: gml_GlobalScript_CoopBoss — Salvage roles: P1 distract (pushback x1.6, dmg x0.6, slows P2's Salvage while flashing), P2 hit (dmg x1.3 / x1.7 in the window). SOLO when the partner is down; host death now enrages too. Snapshot field bf.
+- proto 8.
+
+## 0.8.1
+- S13-1: roles SOLO only on confirmed death (partner snapshot sp=1 / alive=0) or >4 s away from Office (awayAt); reset on every Office entry.
+- S13-2: boss nights keep global.Timer = (Phase-1)*60 -> bot flags use coop_bot_clock() (seconds since Office entry on boss nights). Dead bot sets snapshot brq=1 (optional field, proto stays 8); bot survivor holds V.
+  Revive re-entry (CoopF.revivedEnter) keeps revLeft/aggro, host restores HP = hpKeep - deadDmg (bdmg received while dead), enrage re-applied to the new Salvage (coop_boss_restore_step).
+
+## 0.8.2
+- S14-1: `officeAt` is set in the oCoopNet Step room-change block (before `coop_spec_step`); botdie needs >=1 s in this Office,
+  a fresh partner snapshot with rm=="Office" (when connected); boss night waits for oSalvage (<=20 s, then anim fallback);
+  `botDieDone` is not reset on revive re-entry (`CoopF.revivedEnter`), so one botdie per night.
+- S14-2: botdie sets `CoopF.forceJs` around the kill (bypasses the client token gate: the client only sent a claim and retreated
+  its Salvage) and calls `jumpscare(120, 0, Phase)` directly inside `with (oSalvage)` (no beartrap save). 4 s later a WARNING
+  is logged if still alive.
+- proto 8 unchanged.
+
+## 0.8.3 (S16 human playtest UX)
+- S1/S2: `CoopB.scrapTotal` (host: `array_length(oScraptrap.Tasks)`, client: from `stasks`); strip "SCRAPTRAP  done X/Y (N left)"
+  identical on both sides, drawn only once `scrapTotal > 0` (the oScraptrap spawn itself stays vanilla). `stask` -> `coop_alert("Partner finished: ...")`.
+- B2: `coop_spec_dying_draw()` (Draw GUI End, after the Office overlay) while `CoopS.armed` in the Office: SPECTATING banner at once,
+  black card from +500 ms (`armedAt`) over jumpscare / red transition / death art until the GameOver room spectator view.
+- B3: `coop_alive()` false in the Office while armed -> snapshot alive=0 / `died` sent early -> partner pill DEAD/SPECTATING, not SEATED.
+  `armed` reset in `coop_anim_night_start`.
+- O1: key hint once per session (`CoopS.hintSeen`, 6 s), moved to the bottom band (`_gh-44`); re-shown 4 s after Tab show / F8 in the Office.
+- O2: Tab / F9 / F8 (Office) give `coop_alert` feedback.
+- M2: `coop_pause_requested(local)` refuses in a maze room while oTextBox exists (`CoopM.pauseBlockAt`, maze HUD message 2.5 s);
+  remote pause packets still open the menu. M1 (Rabbit/Purple crouch obstacle) skipped. M3 bot-only, no change.
+- proto 8 unchanged, modver 0.8.3.

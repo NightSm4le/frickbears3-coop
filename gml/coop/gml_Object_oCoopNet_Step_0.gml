@@ -33,10 +33,13 @@ else if (_c.rjN > 0 && _c.rjLeft <= 0 && _c.mode == "off") { coop_log("RECONNECT
 if (room != _c.prevRoom)
 {
     coop_log("room " + room_get_name(room));
+    // 0.7.7 (S9-2): a room that reloads the client's own co-op save (title screen) must not bring back its old difficulty
+    if (coop_is_client() && _c.connected && global.CoopCfg.hostDiff >= 0 && variable_global_exists("Difficulty") && global.Difficulty != global.CoopCfg.hostDiff)
+    { coop_log("ECON: difficulty " + string(global.Difficulty) + " -> host " + string(global.CoopCfg.hostDiff) + " (re-applied after room load)"); global.Difficulty = global.CoopCfg.hostDiff; }
     if (_c.prevRoom == Office) { coop_anim_night_end(); }
     if (room == NightOpening) { coop_score_reset(); BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0 fix: stale 6AM flag from the previous night
     if (room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0: Endless rounds skip NightOpening
-    if (room == Office) { coop_anim_night_start(); coop_feat_office_enter(); global.CoopS.hintUntil = current_time + 8000; global.CoopS.botDieDone = false; global.CoopS.botHelpStep = 0; }
+    if (room == Office) { global.CoopMore.officeAt = current_time; coop_anim_night_start(); coop_feat_office_enter(); if (!global.CoopS.hintSeen) { global.CoopS.hintSeen = true; global.CoopS.hintUntil = current_time + 6000; } /* 0.8.3 (UX-S16-O1): key hint once per session, then on Tab */ if (!global.CoopF.revivedEnter) { global.CoopS.botDieDone = false; } global.CoopS.botHelpStep = 0; } // 0.8.2 (S14-1): officeAt before coop_spec_step; one botdie per night (not again after a revive)
     if (coop_is_host() && _c.connected && room == NightOpening) { coop_send(coop_night_payload()); }
     else if (coop_is_host() && _c.connected && room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { coop_send(coop_night_payload()); coop_log("ENDLESS: night payload sent on Office entry (round " + string(global.EndlessRound) + ")"); }
     _c.prevRoom = room;
@@ -44,7 +47,7 @@ if (room != _c.prevRoom)
 if (coop_is_host() && _c.connected && room == Office && current_time - _c.lastClockSend > 500)
 {
     _c.lastClockSend = current_time;
-    coop_send({ t: "clock", timer: global.Timer });
+    coop_send({ t: "clock", timer: (variable_global_exists("Timer") ? global.Timer : 0) });
 }
 // --- partner snapshot ~10/s ---
 if (_c.connected && current_time - _c.lastSnapSend >= 100)
@@ -61,6 +64,7 @@ coop_feat_step();
 coop_more_step();
 coop_sync_step();
 coop_s3_step();
+coop_story_step(); // 0.8.0 (215-sync)
 coop_ui_keys();
 coop_title_step();
 // --- ping (P) ---
@@ -80,7 +84,7 @@ if (_c.bot)
         coop_log("bot: closed both doors at timer " + string(global.Timer));
     }
     BotOfficeFrames = (room == Office) ? BotOfficeFrames + 1 : 0;
-    if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && (is_real(global.Night) ? global.Timer >= _c.botWin : BotOfficeFrames >= _c.botWin * 60)) // 0.6.0: Custom/Endless timer is not a 0-based clock -> use seconds in Office
+    if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && ((is_real(global.Night) && global.Timer >= _c.botWin) || (!is_real(global.Night) && BotOfficeFrames >= _c.botWin * 60))) // 0.6.0: Custom/Endless timer is not a 0-based clock -> use seconds in Office
     {
         BotWinDone = true;
         coop_log("bot: forcing win_night at timer " + string(global.Timer));
@@ -91,7 +95,7 @@ if (_c.bot)
         // bot AI levels (applied as a floor, every frame, so the hour-change ai_set and our boosts stack on top)
         for (var k = 0; k < array_length(_c.botAI); k++) { var _e = _c.botAI[k]; if (global.AILevels[_e[0]] < _e[1]) { global.AILevels[_e[0]] = _e[1]; } }
         if (_c.botCam && _c.botShot == "") { global.CamUp = 1; global.MonitorSystem = "Cameras"; }
-        if (_c.botKick >= 0 && !BotKickDone && global.Timer >= _c.botKick)
+        if (_c.botKick >= 0 && !BotKickDone && variable_global_exists("Timer") && global.Timer >= _c.botKick)
         {
             BotKickDone = true;
             coop_log("bot: kick - advancing every active animatronic at timer " + string(global.Timer));
@@ -164,7 +168,9 @@ if (_c.bot)
     }
 }
 // --- menu (F8, not during a night) ---
-if (keyboard_check_pressed(vk_f8) && room != Office && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op")) { _c.menuOpen = !_c.menuOpen; _c.focus = 0; }
+if (keyboard_check_pressed(vk_f8) && room != Office && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op")) { _c.menuOpen = !_c.menuOpen; _c.focus = 0; coop_log("F8: co-op menu " + (_c.menuOpen ? "open" : "closed")); }
+// 0.8.3 (UX-S16-O2): F8 does nothing in the Office (no connect menu mid-night) - say so instead of silently ignoring it
+else if (keyboard_check_pressed(vk_f8) && room == Office) { coop_alert("F8: co-op menu is closed during a night | Tab: hide/show co-op HUD | F9: move it", c_ltgray, undefined); global.CoopS.hintUntil = current_time + 4000; }
 if (_c.menuOpen && room == Office) { _c.menuOpen = false; }
 if (_c.menuOpen)
 {

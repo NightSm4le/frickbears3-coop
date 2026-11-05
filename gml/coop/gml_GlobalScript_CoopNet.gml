@@ -3,8 +3,8 @@
 // Works through Porthole / any single-port TCP tunnel: client connects to 127.0.0.1:<port>.
 
 global.Coop = {
-    proto: 7,
-    modver: "0.6.6",
+    proto: 8,
+    modver: "0.8.3",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -21,6 +21,7 @@ global.Coop = {
     rtt: -1,
     status: "offline",
     bot: false,
+    botImplied: "",       // 0.7.9 (S11-1): the -coop-bot* / -coop-autonight flag that switched bot mode on by itself
     autoNight: -1,
     logFile: "coop.log",
     lastClockSend: 0,
@@ -62,49 +63,138 @@ global.Coop = {
     botDie: -1
 };
 
-global.CoopPause = { remotePending: false, remoteOpening: false, remotePaused: false, remoteResume: false, localPaused: false };
+global.CoopPause = { remotePending: false, remoteOpening: false, remotePaused: false, remoteResume: false, localPaused: false, opening: false };
 
-function coop_pause_requested()
+// synced from the 0.6.6@2.1.5 user build (988a): pause open/resume race fix
+function coop_pause_requested(arg0)
 {
     var _p = global.CoopPause;
-    if (!_p.remotePending) { return false; }
-    _p.remotePending = false;
-    _p.remoteOpening = true;
-    return true;
+    if (_p.opening || instance_exists(oTransitionMinigame))
+    {
+        return false;
+    }
+    if (_p.remotePending)
+    {
+        _p.remotePending = false;
+        _p.remoteOpening = true;
+        _p.opening = true;
+        return true;
+    }
+    if (arg0)
+    {
+        // 0.8.3 (UX-S16-M2): in a co-op maze a LOCAL ESC while a dialog is open is refused (the shared pause menu drew over
+        // the textbox and both were unreadable). Finish the dialog, then pause. A partner's remote pause still opens.
+        if (global.Coop.connected && coop_is_maze_room(room) && instance_exists(oTextBox))
+        {
+            if (current_time - global.CoopM.pauseBlockAt > 2500) { coop_log("PAUSE: refused - dialog open in the maze"); }
+            global.CoopM.pauseBlockAt = current_time;
+            return false;
+        }
+        _p.opening = true;
+        return true;
+    }
+    return false;
 }
 
+// synced from the 0.6.6@2.1.5 user build (988a): pause open/resume race fix
 function coop_pause_on_open()
 {
-    var _p = global.CoopPause, _c = global.Coop;
-    if (_p.remoteOpening) { _p.remoteOpening = false; _p.remotePaused = true; coop_log("PAUSE: partner paused both games"); return; }
-    if (_c.connected) { _p.localPaused = true; coop_send({ t: "pause", paused: 1 }); coop_log("PAUSE: requested for both games"); }
+    var _p = global.CoopPause;
+    var _c = global.Coop;
+    _p.opening = true;
+    if (_p.remoteOpening)
+    {
+        _p.remoteOpening = false;
+        _p.remotePaused = true;
+        coop_log("PAUSE: partner paused both games");
+        exit;
+    }
+    if (_c.connected)
+    {
+        _p.localPaused = true;
+        coop_send(
+        {
+            t: "pause",
+            paused: 1
+        });
+        coop_log("PAUSE: requested for both games");
+    }
 }
 
+// synced from the 0.6.6@2.1.5 user build (988a): pause open/resume race fix
 function coop_pause_on_close()
 {
-    var _p = global.CoopPause, _c = global.Coop;
-    if (_p.remoteResume) { _p.remoteResume = false; _p.remotePaused = false; return; }
+    var _p = global.CoopPause;
+    var _c = global.Coop;
+    _p.opening = false;
+    if (_p.remoteResume)
+    {
+        _p.remoteResume = false;
+        _p.remotePaused = false;
+        _p.localPaused = false;
+        exit;
+    }
     if (_c.connected && (_p.localPaused || _p.remotePaused))
     {
-        _p.localPaused = false; _p.remotePaused = false;
-        coop_send({ t: "pause", paused: 0 });
+        _p.localPaused = false;
+        _p.remotePaused = false;
+        coop_send(
+        {
+            t: "pause",
+            paused: 0
+        });
         coop_log("PAUSE: resume sent to partner");
     }
 }
 
-function coop_pause_packet(_m)
+// synced from the 0.6.6@2.1.5 user build (988a): pause open/resume race fix
+function coop_pause_packet(arg0)
 {
     var _p = global.CoopPause;
-    if (_m.paused)
+    if (arg0.paused)
     {
-        _p.remotePending = true; _p.remotePaused = true;
+        if (!_p.opening)
+        {
+            _p.remotePending = true;
+        }
+        _p.remotePaused = true;
         coop_log("PAUSE: partner paused; opening local pause menu");
     }
     else
     {
-        _p.remotePending = false; _p.remotePaused = false; _p.remoteResume = true;
-        if (instance_exists(oPauser)) { with (oPauser) { Unpause = true; } }
-        if (instance_exists(oPersistentPauser)) { with (oPersistentPauser) { Unpause = true; } }
+        _p.remotePending = false;
+        _p.remotePaused = false;
+        _p.remoteResume = true;
+        var _unpaused = false;
+        if (instance_exists(oPauser))
+        {
+            with (oPauser)
+            {
+                if (Paused && !Unpause)
+                {
+                    Unpause = true;
+                    _unpaused = true;
+                }
+            }
+        }
+        if (!_unpaused && instance_exists(oPersistentPauser))
+        {
+            with (oPersistentPauser)
+            {
+                if (Paused && !Unpause)
+                {
+                    Unpause = true;
+                    _unpaused = true;
+                }
+            }
+        }
+        // 0.7.3: the local pause menu (oTitleMenu) must close with the remote resume, else it stays on screen while the game runs
+        if (_unpaused && room != TitleScreenMap && instance_exists(oTitleMenu)) { with (oTitleMenu) { instance_destroy(); } }
+        if (!_unpaused)
+        {
+            _p.opening = false;
+            _p.remoteResume = false;
+        }
         coop_log("PAUSE: partner resumed; resuming local game");
     }
 }
@@ -125,22 +215,29 @@ function coop_parse_args()
 {
     var _c = global.Coop;
     var _n = parameter_count();
+    // 0.7.9 (S11-1): every -coop-bot<x> flag and -coop-autonight only run inside bot mode (oCoopNet Step "if (_c.bot)",
+    // coop_more_bot, coop_s3_bot_step...), so any of them now implies -coop-bot (which also skips BEAR IN MIND).
+    for (var i = 0; i < _n; i++)
+    {
+        var _q = parameter_string(i);
+        if (_q != "-coop-bot" && (string_copy(_q, 1, 9) == "-coop-bot" || _q == "-coop-autonight")) { if (_c.botImplied == "") { _c.botImplied = _q; } }
+    }
     for (var i = 0; i < _n; i++)
     {
         var _p = parameter_string(i);
         if (_p == "-coop-host") { _c.mode = "want_host"; }
         else if (_p == "-coop-join") { _c.mode = "want_join"; if (i + 1 < _n && string_char_at(parameter_string(i + 1), 1) != "-") { i++; _c.ip = parameter_string(i); } }
-        else if (_p == "-coop-port" && i + 1 < _n) { i++; _c.port = real(parameter_string(i)); }
+        else if (_p == "-coop-port" && i + 1 < _n) { i++; _c.port = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-bot") { _c.bot = true; }
-        else if (_p == "-coop-autonight" && i + 1 < _n) { i++; _c.autoNight = real(parameter_string(i)); }
+        else if (_p == "-coop-autonight" && i + 1 < _n) { i++; _c.autoNight = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-log" && i + 1 < _n) { i++; _c.logFile = parameter_string(i); }
         else if (_p == "-coop-botping") { _c.botPing = true; }
-        else if (_p == "-coop-botdoors" && i + 1 < _n) { i++; _c.botDoors = real(parameter_string(i)); }
+        else if (_p == "-coop-botdoors" && i + 1 < _n) { i++; _c.botDoors = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botendless") { _c.botEndless = true; }
-        else if (_p == "-coop-botendlessround" && i + 1 < _n) { i++; _c.botEndless = true; _c.botEndlessRound = max(1, real(parameter_string(i))); }
+        else if (_p == "-coop-botendlessround" && i + 1 < _n) { i++; _c.botEndless = true; _c.botEndlessRound = max(1, coop_arg_num(parameter_string(i), 0)); }
         else if (_p == "-coop-botphony") { _c.botPhony = true; }
-        else if (_p == "-coop-botcustom" && i + 1 < _n) { i++; _c.botCustom = real(parameter_string(i)); }
-        else if (_p == "-coop-botwin" && i + 1 < _n) { i++; _c.botWin = real(parameter_string(i)); }
+        else if (_p == "-coop-botcustom" && i + 1 < _n) { i++; _c.botCustom = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botwin" && i + 1 < _n) { i++; _c.botWin = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botai" && i + 1 < _n)
         {
             i++;
@@ -148,16 +245,21 @@ function coop_parse_args()
             for (var k = 0; k < array_length(_parts); k++) { var _kv = string_split(_parts[k], "="); if (array_length(_kv) == 2) { array_push(_c.botAI, [real(_kv[0]), real(_kv[1])]); } }
         }
         else if (_p == "-coop-botcam") { _c.botCam = true; }
-        else if (_p == "-coop-botdrop" && i + 1 < _n) { i++; _c.botDrop = real(parameter_string(i)); } // 0.6.2: client fakes a lost host after N s in the Office
-        else if (_p == "-coop-botkick" && i + 1 < _n) { i++; _c.botKick = real(parameter_string(i)); }
-        else if (_p == "-coop-botlure" && i + 1 < _n) { i++; _c.botLure = real(parameter_string(i)); }
-        else if (_p == "-coop-botrepel" && i + 1 < _n) { i++; global.CoopA.repelChance = real(parameter_string(i)); }
-        else if (_p == "-coop-botlurechance" && i + 1 < _n) { i++; global.CoopA.lureChance = real(parameter_string(i)); }
+        else if (_p == "-coop-botdrop" && i + 1 < _n) { i++; _c.botDrop = coop_arg_num(parameter_string(i), 0); } // 0.6.2: client fakes a lost host after N s in the Office
+        else if (_p == "-coop-botkick" && i + 1 < _n) { i++; _c.botKick = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botlure" && i + 1 < _n) { i++; _c.botLure = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botrepel" && i + 1 < _n) { i++; global.CoopA.repelChance = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botlurechance" && i + 1 < _n) { i++; global.CoopA.lureChance = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botshots" && i + 1 < _n) { i++; _c.botShots = string_split(parameter_string(i), ","); }
     }
     coop_spec_parse_args();
     coop_feat_parse_args();
     coop_more_parse_args();
+    if (_c.botImplied != "")
+    {
+        if (_c.bot) { _c.botImplied = ""; }
+        else { _c.bot = true; coop_log("bot: mode ON (implied by " + _c.botImplied + ", no -coop-bot given)"); }
+    }
 }
 
 function coop_is_client() { return global.Coop.mode == "client"; }
@@ -168,7 +270,7 @@ function coop_active() { return variable_global_exists("Coop") && global.Coop.mo
 function coop_block_save(_what)
 {
     // 0.5.0: both sides write their OWN co-op save file (global.CoopSaveTag), the original is never touched
-    if (coop_active()) { coop_log("save -> co-op file (" + global.CoopSaveTag + "): " + _what); }
+    if (coop_active()) { coop_log("save -> co-op file (" + global.CoopSaveTag + "): " + _what); coop_story_save_merge(_what); }
     return false;
 }
 
@@ -229,6 +331,7 @@ function coop_disconnect(_why)
     _c.connected = false;
     _c.mode = "off";
     _c.rtt = -1;
+    global.CoopCfg.hostDiff = -1; // 0.7.7 (S9-2)
     _c.status = "offline (" + _why + ")";
 }
 
@@ -272,6 +375,7 @@ function coop_night_payload()
         if (variable_global_exists("AllTimeSalvages")) { _m.salv = global.AllTimeSalvages; }
         if (variable_global_exists("BossPhase")) { _m.bossphase = global.BossPhase; }
     }
+    if (is_numeric(global.Night)) { _m.story = coop_story_collect(); } // 0.8.0 (215-sync): one story branch for both
     return _m;
 }
 
@@ -281,7 +385,7 @@ function coop_apply_night(_m)
     var _c = global.Coop;
     global.Night = variable_struct_get(_m, "night");
     coop_prepare_night();
-    if (variable_struct_exists(_m, "difficulty")) { global.Difficulty = _m.difficulty; }
+    if (variable_struct_exists(_m, "difficulty")) { global.Difficulty = _m.difficulty; if (coop_is_client()) { global.CoopCfg.hostDiff = _m.difficulty; } }
     if (variable_struct_exists(_m, "ai")) { global.AILevels = _m.ai; }
     if (variable_struct_exists(_m, "speedup")) { global.NightSpeedup = _m.speedup; }
     if (variable_struct_exists(_m, "shuffle")) { global.ShuffleMode = _m.shuffle; }
@@ -311,6 +415,7 @@ function coop_apply_night(_m)
         coop_log("ENDLESS: round " + string(global.EndlessRound) + " guard " + string(global.Guard) + " salvages " + string(array_length(global.AllTimeSalvages)) + " from host");
     }
     coop_log("ECON: difficulty " + string(global.Difficulty) + " from host (one difficulty for both)");
+    if (coop_is_client() && variable_struct_exists(_m, "story")) { coop_story_apply(_m.story, true, "night " + string(global.Night) + " start"); }
     coop_log("host started night " + string(global.Night));
 }
 
@@ -419,7 +524,7 @@ function coop_on_packet(_m)
             if (coop_is_host()) { coop_drop_partner("partner left"); } else { coop_disconnect("host left"); }
             break;
         default:
-            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m) && !coop_s3_packet(_t, _m) && !coop_s4_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
+            if (!coop_help_packet(_t, _m) && !coop_anim_packet(_t, _m) && !coop_feat_packet(_t, _m) && !coop_more_packet(_t, _m) && !coop_sync_packet(_t, _m) && !coop_s3_packet(_t, _m) && !coop_s4_packet(_t, _m) && !coop_story_packet(_t, _m)) { coop_log("unknown packet " + string(_t)); }
     }
 }
 
@@ -463,12 +568,16 @@ function coop_alive()
 {
     if (room == GameOver) { return false; }
     if (instance_exists(oJumpscareTransition)) { return false; }
+    // 0.8.3 (UX-S16-B3): a co-op death (spectator armed in count_jumpscare) is final for this Office visit - the partner
+    // must not see me as SEATED during the seconds of jumpscare/death art before the GameOver room
+    if (room == Office && global.CoopS.armed) { return false; }
     return true;
 }
 
 function coop_snapshot()
 {
     var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive(), sp: global.CoopS.spec ? 1 : 0, sc: coop_score_arr() };
+    if (global.CoopS.spec && global.Coop.bot && global.CoopF.botRevive >= 0 && coop_bot_clock() >= global.CoopF.botRevive) { _s.brq = 1; } // 0.8.1: dead bot asks a bot survivor to revive (optional field)
     if (variable_global_exists("Guard") && is_numeric(global.Guard)) { _s.gn = guard_name(global.Guard); }
     if (variable_global_exists("TimeOfDeath") && is_numeric(global.TimeOfDeath)) { _s.tod = global.TimeOfDeath; }
     if (room == Office)
@@ -487,6 +596,7 @@ function coop_snapshot()
         _s.dc = floor(global.CoopA.myDc);
         if (variable_global_exists("PanelUp")) { _s.pu = global.PanelUp ? 1 : 0; }
         if (variable_global_exists("MonitorSystem")) { _s.ms = global.MonitorSystem; }
+        if (instance_exists(oSalvage)) { _s.bf = coop_boss_flashing() ? 1 : 0; } // 0.8.0: boss role window
     }
     return _s;
 }
@@ -535,16 +645,19 @@ function coop_draw_gui()
     {
         var _bt = "Connection lost - reconnecting... (try " + string(_c.rjN) + "/20)";
         var _bw = string_width(_bt) + 12, _bx = display_get_gui_width() / 2 - _bw / 2;
-        draw_set_alpha(0.75); draw_set_color(c_black); draw_rectangle(_bx, 46, _bx + _bw, 62, false); draw_set_alpha(1);
+        coop_ui_panel(_bx, 46, _bx + _bw, 62);
         draw_set_color(c_yellow); draw_text(_bx + 6, 48, _bt); draw_set_color(c_white);
     }
     // small status line (always, when coop active)
     else if (_c.mode != "off" && !_c.menuOpen && !(room == Office && _c.connected) && !(coop_is_maze_room(room) && _c.connected) && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op"))
     {
-        draw_set_alpha(0.7);
-        draw_set_color(c_white);
-        draw_text(4, 4, "COOP " + _c.mode + ": " + _c.status + (_c.rtt >= 0 ? "  " + string(_c.rtt) + "ms" : ""));
-        draw_set_alpha(1);
+        if (!instance_exists(oTitleMenu))
+        {
+            var _st = "CO-OP " + string_upper(_c.mode) + (_c.connected ? "  " + ((_c.rtt >= 0) ? string(_c.rtt) + "ms" : "...") : "  " + _c.status);
+            var _sy = display_get_gui_height() - 19; // 0.7.4: bottom-left, off the Extras / menu titles
+            coop_ui_panel(3, _sy, 3 + string_width(_st) + 8, _sy + 15);
+            draw_set_alpha(0.9); draw_set_color(_c.connected ? make_color_rgb(244, 240, 232) : c_yellow); draw_text(7, _sy + 1, _st); draw_set_alpha(1); draw_set_color(c_white);
+        }
     }
     // --- stage 4: spectator view replaces the death screen; the alive side streams frames ---
     if (global.CoopS.spec && room == GameOver) { coop_spec_draw(); return; }
@@ -552,15 +665,17 @@ function coop_draw_gui()
     coop_warn_draw();
     coop_feat_draw();
     coop_more_draw();
+    coop_salv_draw(); coop_boss_roles_draw();
     coop_draw_scene_participants();
     coop_sync_draw();
     coop_s3_draw();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
     if (room == Office && _c.connected) { coop_draw_overlay(); }
+    coop_spec_dying_draw(); // 0.8.3 (UX-S16-B2): on top of every Office band
     if (!_c.menuOpen) { return; }
     var _gw = display_get_gui_width(), _gh = display_get_gui_height();
     var _x = _gw / 2 - 150, _y = _gh / 2 - 90;
-    draw_set_alpha(0.85); draw_set_color(c_black); draw_rectangle(_x, _y, _x + 300, _y + 175, false); draw_set_alpha(1);
+    coop_ui_panel(_x, _y, _x + 300, _y + 175);
     draw_set_color(c_white); draw_rectangle(_x, _y, _x + 300, _y + 175, true);
     draw_text(_x + 10, _y + 10, "CO-OP (F8)");
     draw_text(_x + 10, _y + 42, "IP:");
@@ -606,4 +721,13 @@ function coop_bot_drop_due(_c)
 {
     if (!variable_struct_exists(_c, "botDropAt") || _c.botDropAt < 0) { _c.botDropAt = current_time; }
     return current_time - _c.botDropAt >= _c.botDrop * 1000;
+}
+
+// 0.7.6 (S7-2): safe numeric parse for -coop-* flags. Missing/empty/non-numeric value -> default, never a Code Error.
+function coop_arg_num(_s, _def)
+{
+    if (!is_string(_s) || _s == "") { return _def; }
+    var _r = _def;
+    try { _r = real(_s); } catch (_e) { _r = _def; }
+    return _r;
 }
