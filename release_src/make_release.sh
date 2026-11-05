@@ -4,7 +4,7 @@ set -e; cd "$(dirname "$0")"; R=$PWD; F=/workspace/frickbears
 SRC=${SRC:-$F/clean/data.win}; SRC_NAME=${SRC_NAME:-clean v2.0.2}; VER=${VER:-test}
 export WINEPREFIX=$F/prefA WINEDEBUG=-all
 rm -rf pkg/FB3-Coop-$VER; P=pkg/FB3-Coop-$VER; mkdir -p $P
-cp dl/xdelta3-3.1.0-x86_64.exe $P/xdelta3.exe
+cp $F/release/dl/xdelta3-3.1.0-x86_64.exe $P/xdelta3.exe
 cp $F/build/data.win out_data.win
 wine $P/xdelta3.exe -e -9 -f -s $SRC out_data.win $P/fb3coop.xdelta
 OUT=$(sha256sum out_data.win | cut -d' ' -f1); PS=$(sha256sum $P/fb3coop.xdelta | cut -d' ' -f1)
