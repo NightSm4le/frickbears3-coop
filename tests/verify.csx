@@ -70,7 +70,7 @@ if (stage == "full")
     var moreChecks = D("gml_GlobalScript_CoopMore");
     need(moreChecks.Contains("SCRAPTRAP: ") && moreChecks.Contains("instance_find(oCamera3DMaze"), "shared task explanation or guarded maze HUD missing");
     var ui = D("gml_GlobalScript_CoopUI");
-    need(ui.Contains("coop_draw_scene_participants") && ui.Contains("P\" + string(_me)"), "co-op participants are not shown during story dialogs");
+    need(ui.Contains("coop_draw_scene_participants") && (ui.Contains("P\" + string(_me)") || ui.Contains("PLAYER \" + string(_me)")), "co-op participants are not shown during story dialogs");
     need(ui.Contains("function coop_draw_night_participants()") && ui.Contains("coop_scene_mod_sprite(_otherName)"), "both players are not drawn on the night location card");
     need(ui.Contains("addons/") && ui.Contains("/selection.png") && ui.Contains("sprite_add(_path, 2"), "location card does not load a modded guard selection sprite");
     need(ui.Contains("string_pos(\"..\", arg0)") && ui.Contains("string_pos(\"\\\\\", arg0)"), "remote mod sprite path is not validated");
@@ -82,7 +82,7 @@ if (stage == "full")
     foreach (var n in new[] { "gml_Object_oPauser_Step_2", "gml_Object_oPersistentPauser_Step_2" })
     {
         var pz = D(n);
-        need(pz.Contains("coop_pause_requested()") && pz.Contains("coop_pause_on_close()"), n + " pause sync hooks missing");
+        need(pz.Contains("coop_pause_requested(") && pz.Contains("coop_pause_on_close()"), n + " pause sync hooks missing");
     }
     if (adminCheats)
     {

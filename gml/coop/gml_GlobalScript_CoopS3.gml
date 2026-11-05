@@ -29,6 +29,7 @@ function coop_s3_parse_args()
         else if (_p == "-coop-botbossreal") { i++; _S.bossReal = real(_v); }
         else if (_p == "-coop-botending") { i++; _S.ending = string_lower(_v); }
         else if (_p == "-coop-botbosswin") { i++; _S.bossWin = real(_v); }
+        else if (_p == "-coop-botsit") { i++; global.CoopM.botSit = real(_v); }
     }
 }
 

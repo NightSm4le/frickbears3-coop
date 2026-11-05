@@ -61,25 +61,64 @@ function coop_partner_state_text()
     return ["", c_white];
 }
 
+// synced from the 0.6.6@2.1.5 user build (988a): bigger PLAYER cards + addon scene art
 function coop_draw_scene_participants()
 {
-    if (!global.Coop.connected || room == Office) { return; }
+    if (!global.Coop.connected || room == Office)
+    {
+        exit;
+    }
+    if (!variable_global_exists("CoopSceneArt"))
+    {
+        global.CoopSceneArt = 
+        {
+            names: [],
+            sprites: []
+        };
+    }
     if (room == NightOpening)
     {
         coop_draw_night_participants();
-        return;
+        exit;
     }
-    if (!instance_exists(oTextBox) && !instance_exists(oTextBox_Fredbear)) { return; }
-    var _gw = display_get_gui_width(), _me = coop_my_slot(), _other = coop_partner_slot();
-    var _ownSpr = coop_art_get(_me, global.CoopCfg.mask, "portrait");
-    var _partnerSpr = coop_art_get(_other, global.CoopCfg.partnerMask, "portrait");
-    var _sz = 32, _y = 24;
-    draw_set_alpha(0.75); draw_set_color(c_black); draw_rectangle(3, _y - 2, 39, _y + 48, false); draw_rectangle(_gw - 39, _y - 2, _gw - 3, _y + 48, false);
+    var _gw = display_get_gui_width();
+    var _me = coop_my_slot();
+    var _other = coop_partner_slot();
+    var _myName = guard_name(global.Guard);
+    var _otherName = string(coop_partner_get("gn", ""));
+    var _ownSpr = coop_scene_mod_sprite(_myName);
+    var _partnerSpr = coop_scene_mod_sprite(_otherName);
+    if (_ownSpr < 0)
+    {
+        _ownSpr = coop_art_get(_me, global.CoopCfg.mask, "portrait");
+    }
+    if (_partnerSpr < 0)
+    {
+        _partnerSpr = coop_art_get(_other, global.CoopCfg.partnerMask, "portrait");
+    }
+    var _sz = 48;
+    var _y = 24;
+    var _boxW = 58;
+    var _boxH = 70;
+    draw_set_alpha(0.78);
+    draw_set_color(c_black);
+    draw_rectangle(3, _y - 2, 3 + _boxW, _y + _boxH, false);
+    draw_rectangle(_gw - 3 - _boxW, _y - 2, _gw - 3, _y + _boxH, false);
     draw_set_alpha(1);
-    draw_set_color(c_white); draw_set_halign(fa_center); draw_text(21, _y - 1, "P" + string(_me)); draw_text(_gw - 21, _y - 1, "P" + string(_other));
-    if (_ownSpr >= 0) { draw_sprite_ext(_ownSpr, 0, 5, _y + 12, _sz / sprite_get_width(_ownSpr), _sz / sprite_get_height(_ownSpr), 0, c_white, 1); }
-    if (_partnerSpr >= 0) { draw_sprite_ext(_partnerSpr, 0, _gw - 37, _y + 12, _sz / sprite_get_width(_partnerSpr), _sz / sprite_get_height(_partnerSpr), 0, c_white, 1); }
-    draw_set_halign(fa_left); draw_set_color(c_white);
+    draw_set_color(c_white);
+    draw_set_halign(fa_center);
+    draw_text(3 + (_boxW / 2), _y - 1, "PLAYER " + string(_me));
+    draw_text(_gw - 3 - (_boxW / 2), _y - 1, "PLAYER " + string(_other));
+    if (_ownSpr >= 0)
+    {
+        draw_sprite_ext(_ownSpr, 0, 8, _y + 14, _sz / sprite_get_width(_ownSpr), _sz / sprite_get_height(_ownSpr), 0, c_white, 1);
+    }
+    if (_partnerSpr >= 0)
+    {
+        draw_sprite_ext(_partnerSpr, 0, _gw - 8 - _sz, _y + 14, _sz / sprite_get_width(_partnerSpr), _sz / sprite_get_height(_partnerSpr), 0, c_white, 1);
+    }
+    draw_set_halign(fa_left);
+    draw_set_color(c_white);
 }
 
 function coop_scene_mod_sprite(_guardName)
@@ -112,37 +151,66 @@ function coop_scene_mod_sprite(_guardName)
     return _spr;
 }
 
+// synced from the 0.6.6@2.1.5 user build (988a): bigger PLAYER cards + addon scene art
 function coop_draw_night_participants()
 {
-    if (!variable_global_exists("CoopSceneArt")) { global.CoopSceneArt = { names: [], sprites: [] }; }
-    var _gw = display_get_gui_width(), _gh = display_get_gui_height();
-    var _mySlot = coop_my_slot(), _otherSlot = coop_partner_slot();
+    if (!variable_global_exists("CoopSceneArt"))
+    {
+        global.CoopSceneArt = 
+        {
+            names: [],
+            sprites: []
+        };
+    }
+    var _gw = display_get_gui_width();
+    var _gh = display_get_gui_height();
+    var _mySlot = coop_my_slot();
+    var _otherSlot = coop_partner_slot();
     var _myName = guard_name(global.Guard);
     var _otherName = string(coop_partner_get("gn", ""));
     var _mySpr = coop_scene_mod_sprite(_myName);
     var _otherSpr = coop_scene_mod_sprite(_otherName);
-    if (_mySpr < 0) { _mySpr = coop_art_get(_mySlot, global.CoopCfg.mask, "portrait"); }
-    if (_otherSpr < 0) { _otherSpr = coop_art_get(_otherSlot, global.CoopCfg.partnerMask, "portrait"); }
-
-    var _baseY = _gh * 0.765;
-    var _centers = [_gw * 0.45, _gw * 0.55];
+    if (_mySpr < 0)
+    {
+        _mySpr = coop_art_get(_mySlot, global.CoopCfg.mask, "portrait");
+    }
+    if (_otherSpr < 0)
+    {
+        _otherSpr = coop_art_get(_otherSlot, global.CoopCfg.partnerMask, "portrait");
+    }
+    var _baseY = _gh * 0.89;
+    var _centers = [(_gw * 0.5) - 64, (_gw * 0.5) + 64];
     var _slots = [_mySlot, _otherSlot];
     var _sprites = [_mySpr, _otherSpr];
-    draw_set_halign(fa_center); draw_set_valign(fa_top);
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_top);
     for (var i = 0; i < 2; i++)
     {
-        var _spr = _sprites[i], _cx = _centers[i], _slot = _slots[i];
+        var _spr = _sprites[i];
+        var _cx = _centers[i];
+        var _slot = _slots[i];
+        var _left = _cx - 52;
+        var _top = _baseY - 122;
+        var _slotColor = (_slot == 1) ? make_color_rgb(96, 152, 232) : make_color_rgb(240, 152, 64);
+        draw_set_alpha(0.82);
+        draw_set_color(c_black);
+        draw_rectangle(_left, _top, _cx + 52, _baseY + 2, false);
+        draw_set_alpha(1);
+        draw_set_color(_slotColor);
+        draw_rectangle(_left, _top, _cx + 52, _baseY + 2, true);
+        draw_set_color(c_white);
+        draw_text(_cx, _top + 3, "PLAYER " + string(_slot));
         if (_spr >= 0)
         {
-            var _sw = max(1, sprite_get_width(_spr)), _sh = max(1, sprite_get_height(_spr));
-            var _scale = min(52 / _sw, 48 / _sh);
-            draw_sprite_ext(_spr, 0, _cx - _sw * _scale * 0.5, _baseY - _sh * _scale, _scale, _scale, 0, c_white, 1);
+            var _sw = max(1, sprite_get_width(_spr));
+            var _sh = max(1, sprite_get_height(_spr));
+            var _scale = min(88 / _sw, 92 / _sh);
+            draw_sprite_ext(_spr, 0, _cx - (_sw * _scale * 0.5), _baseY - (_sh * _scale) - 8, _scale, _scale, 0, c_white, 1);
         }
-        var _label = "P" + string(_slot);
-        draw_set_alpha(0.75); draw_set_color(c_black); draw_rectangle(_cx - 48, _baseY - 61, _cx + 48, _baseY - 49, false);
-        draw_set_alpha(1); draw_set_color(c_white); draw_text(_cx, _baseY - 60, _label);
     }
-    draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(c_white);
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_color(c_white);
 }
 
 function coop_draw_overlay()

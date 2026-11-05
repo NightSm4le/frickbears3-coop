@@ -264,28 +264,32 @@ function coop_tb_can(_i)
 }
 
 // one forward press on ONE textbox (same as oTextBox draw_everything with ForwardKey)
+// 0.6.6@2.1.5 (user build): `return` inside with() is miscompiled by UTMT -> run the body as a bound method instead
+function coop_tb_forward_self()
+{
+    if (TextDrawChar != TextLength[TextPage]) { TextDrawChar = TextLength[TextPage]; return "reveal"; }
+    if (TextPage < (TextPageNumber - 1))
+    {
+        if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; audio_play_sound(sfxCamSwitch, 5, false); initialize(); var _boundGameText = method(id, game_text); _boundGameText(_dst); }
+        TextPage += 1; TextDrawChar = 0;
+        if (is_callable(Function[TextPage])) { Function[TextPage](); }
+        if (array_length(CGPFunction) > 0 && TextPage < array_length(CGPFunction))
+        {
+            var _f = CGPFunction[TextPage];
+            if (array_length(_f) == 1) { _f[0](); } else if (array_length(_f) > 1) { _f[0](_f[1]); }
+        }
+        Frame = 0;
+        return "adv";
+    }
+    instance_destroy();
+    return "end";
+}
+
 function coop_tb_forward_inst(_i)
 {
-    with (_i)
-    {
-        if (TextDrawChar != TextLength[TextPage]) { TextDrawChar = TextLength[TextPage]; return "reveal"; }
-        if (TextPage < (TextPageNumber - 1))
-        {
-            if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; audio_play_sound(sfxCamSwitch, 5, false); initialize(); var _boundGameText = method(id, game_text); _boundGameText(_dst); }
-            TextPage += 1; TextDrawChar = 0;
-            if (is_callable(Function[TextPage])) { Function[TextPage](); }
-            if (array_length(CGPFunction) > 0 && TextPage < array_length(CGPFunction))
-            {
-                var _f = CGPFunction[TextPage];
-                if (array_length(_f) == 1) { _f[0](); } else if (array_length(_f) > 1) { _f[0](_f[1]); }
-            }
-            Frame = 0;
-            return "adv";
-        }
-        instance_destroy();
-        return "end";
-    }
-    return "";
+    if (!instance_exists(_i)) { return ""; }
+    var _forward = method(_i, coop_tb_forward_self);
+    return _forward();
 }
 
 function coop_tb_list()

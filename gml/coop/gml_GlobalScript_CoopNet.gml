@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 7,
-    modver: "0.6.6",
+    modver: "0.7.3",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -62,49 +62,128 @@ global.Coop = {
     botDie: -1
 };
 
-global.CoopPause = { remotePending: false, remoteOpening: false, remotePaused: false, remoteResume: false, localPaused: false };
+global.CoopPause = { remotePending: false, remoteOpening: false, remotePaused: false, remoteResume: false, localPaused: false, opening: false };
 
-function coop_pause_requested()
+// synced from the 0.6.6@2.1.5 user build (988a): pause open/resume race fix
+function coop_pause_requested(arg0)
 {
     var _p = global.CoopPause;
-    if (!_p.remotePending) { return false; }
-    _p.remotePending = false;
-    _p.remoteOpening = true;
-    return true;
+    if (_p.opening || instance_exists(oTransitionMinigame))
+    {
+        return false;
+    }
+    if (_p.remotePending)
+    {
+        _p.remotePending = false;
+        _p.remoteOpening = true;
+        _p.opening = true;
+        return true;
+    }
+    if (arg0)
+    {
+        _p.opening = true;
+        return true;
+    }
+    return false;
 }
 
+// synced from the 0.6.6@2.1.5 user build (988a): pause open/resume race fix
 function coop_pause_on_open()
 {
-    var _p = global.CoopPause, _c = global.Coop;
-    if (_p.remoteOpening) { _p.remoteOpening = false; _p.remotePaused = true; coop_log("PAUSE: partner paused both games"); return; }
-    if (_c.connected) { _p.localPaused = true; coop_send({ t: "pause", paused: 1 }); coop_log("PAUSE: requested for both games"); }
+    var _p = global.CoopPause;
+    var _c = global.Coop;
+    _p.opening = true;
+    if (_p.remoteOpening)
+    {
+        _p.remoteOpening = false;
+        _p.remotePaused = true;
+        coop_log("PAUSE: partner paused both games");
+        exit;
+    }
+    if (_c.connected)
+    {
+        _p.localPaused = true;
+        coop_send(
+        {
+            t: "pause",
+            paused: 1
+        });
+        coop_log("PAUSE: requested for both games");
+    }
 }
 
+// synced from the 0.6.6@2.1.5 user build (988a): pause open/resume race fix
 function coop_pause_on_close()
 {
-    var _p = global.CoopPause, _c = global.Coop;
-    if (_p.remoteResume) { _p.remoteResume = false; _p.remotePaused = false; return; }
+    var _p = global.CoopPause;
+    var _c = global.Coop;
+    _p.opening = false;
+    if (_p.remoteResume)
+    {
+        _p.remoteResume = false;
+        _p.remotePaused = false;
+        _p.localPaused = false;
+        exit;
+    }
     if (_c.connected && (_p.localPaused || _p.remotePaused))
     {
-        _p.localPaused = false; _p.remotePaused = false;
-        coop_send({ t: "pause", paused: 0 });
+        _p.localPaused = false;
+        _p.remotePaused = false;
+        coop_send(
+        {
+            t: "pause",
+            paused: 0
+        });
         coop_log("PAUSE: resume sent to partner");
     }
 }
 
-function coop_pause_packet(_m)
+// synced from the 0.6.6@2.1.5 user build (988a): pause open/resume race fix
+function coop_pause_packet(arg0)
 {
     var _p = global.CoopPause;
-    if (_m.paused)
+    if (arg0.paused)
     {
-        _p.remotePending = true; _p.remotePaused = true;
+        if (!_p.opening)
+        {
+            _p.remotePending = true;
+        }
+        _p.remotePaused = true;
         coop_log("PAUSE: partner paused; opening local pause menu");
     }
     else
     {
-        _p.remotePending = false; _p.remotePaused = false; _p.remoteResume = true;
-        if (instance_exists(oPauser)) { with (oPauser) { Unpause = true; } }
-        if (instance_exists(oPersistentPauser)) { with (oPersistentPauser) { Unpause = true; } }
+        _p.remotePending = false;
+        _p.remotePaused = false;
+        _p.remoteResume = true;
+        var _unpaused = false;
+        if (instance_exists(oPauser))
+        {
+            with (oPauser)
+            {
+                if (Paused && !Unpause)
+                {
+                    Unpause = true;
+                    _unpaused = true;
+                }
+            }
+        }
+        if (!_unpaused && instance_exists(oPersistentPauser))
+        {
+            with (oPersistentPauser)
+            {
+                if (Paused && !Unpause)
+                {
+                    Unpause = true;
+                    _unpaused = true;
+                }
+            }
+        }
+        if (!_unpaused)
+        {
+            _p.opening = false;
+            _p.remoteResume = false;
+        }
         coop_log("PAUSE: partner resumed; resuming local game");
     }
 }

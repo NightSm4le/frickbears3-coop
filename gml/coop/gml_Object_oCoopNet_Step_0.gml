@@ -44,7 +44,7 @@ if (room != _c.prevRoom)
 if (coop_is_host() && _c.connected && room == Office && current_time - _c.lastClockSend > 500)
 {
     _c.lastClockSend = current_time;
-    coop_send({ t: "clock", timer: global.Timer });
+    coop_send({ t: "clock", timer: (variable_global_exists("Timer") ? global.Timer : 0) });
 }
 // --- partner snapshot ~10/s ---
 if (_c.connected && current_time - _c.lastSnapSend >= 100)
@@ -80,7 +80,7 @@ if (_c.bot)
         coop_log("bot: closed both doors at timer " + string(global.Timer));
     }
     BotOfficeFrames = (room == Office) ? BotOfficeFrames + 1 : 0;
-    if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && (is_real(global.Night) ? global.Timer >= _c.botWin : BotOfficeFrames >= _c.botWin * 60)) // 0.6.0: Custom/Endless timer is not a 0-based clock -> use seconds in Office
+    if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && ((is_real(global.Night) && global.Timer >= _c.botWin) || (!is_real(global.Night) && BotOfficeFrames >= _c.botWin * 60))) // 0.6.0: Custom/Endless timer is not a 0-based clock -> use seconds in Office
     {
         BotWinDone = true;
         coop_log("bot: forcing win_night at timer " + string(global.Timer));
@@ -91,7 +91,7 @@ if (_c.bot)
         // bot AI levels (applied as a floor, every frame, so the hour-change ai_set and our boosts stack on top)
         for (var k = 0; k < array_length(_c.botAI); k++) { var _e = _c.botAI[k]; if (global.AILevels[_e[0]] < _e[1]) { global.AILevels[_e[0]] = _e[1]; } }
         if (_c.botCam && _c.botShot == "") { global.CamUp = 1; global.MonitorSystem = "Cameras"; }
-        if (_c.botKick >= 0 && !BotKickDone && global.Timer >= _c.botKick)
+        if (_c.botKick >= 0 && !BotKickDone && variable_global_exists("Timer") && global.Timer >= _c.botKick)
         {
             BotKickDone = true;
             coop_log("bot: kick - advancing every active animatronic at timer " + string(global.Timer));

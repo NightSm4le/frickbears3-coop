@@ -28,7 +28,7 @@ global.CoopB = { lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, d
     botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapIn: 0, scrapOut: 0, logAt: 0 };
 global.CoopM = { sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
     caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
-    logAt: 0, followed: false, shotAt: 0, targetLog: "" };
+    logAt: 0, followed: false, shotAt: 0, targetLog: "", sit: false, psit: 0, botSit: -1, botSitDone: false, botSitUntil: 0, sitShot: false, sitLog: -1 };
 global.CoopE = { pMoney: -1, pBuys: [], buysIn: 0, buysOut: 0, partnerEr: -1, botBuy: -1, botBuyDone: false, shown: 0 };
 global.CoopMore = { pwAt: 0, botAdv: -1, botAdvAt: 0, roomAt: 0, officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
 
@@ -267,6 +267,7 @@ function coop_more_packet(_t, _m)
             return true;
         case "mz": // partner maze position
             _M.px = _m.x; _M.py = _m.y; _M.pdir = _m.d; _M.pmove = _m.mv; _M.pAlive = _m.al && !(current_time - _M.pCaughtAt < 2000); _M.prm = _m.rm; _M.pAt = current_time;
+            var _ps = variable_struct_exists(_m, "s") ? _m.s : 0; if (_ps != _M.psit) { coop_log("MAZE: partner " + (_ps ? "sat down" : "stood up")); } _M.psit = _ps;
             return true;
         case "mzen": // client: host's enemy states
             _M.enemies = _m.e; _M.enemiesAt = current_time;
@@ -490,7 +491,7 @@ function coop_maze_step()
     {
         _M.lastSend = current_time;
         var _cam = oCamera3DMaze;
-        coop_send({ t: "mz", x: _cam.x, y: _cam.y, d: _cam.CameraRotationH + 180, mv: (_cam.Loudness > 0) ? 1 : 0, al: !_M.meCaught && !instance_exists(oMinigameJumpscare), rm: room_get_name(room) });
+        coop_send({ t: "mz", s: coop_maze_me_sitting(), x: _cam.x, y: _cam.y, d: _cam.CameraRotationH + 180, mv: (_cam.Loudness > 0) ? 1 : 0, al: !_M.meCaught && !instance_exists(oMinigameJumpscare), rm: room_get_name(room) });
     }
     // host ghost: run the normal death once the partner is out of the maze or caught
     if (_M.ghost && !_M.ghostDone && (!_M.sync || !_M.pAlive)) { _M.ghostDone = true; coop_maze_die_local("deferred: partner out of the maze or caught"); }
@@ -607,8 +608,10 @@ function coop_maze_peer_draw()
     var _wf = _M.pmove ? (1 + ((current_time div 180) mod 2)) : 0;
     var _sub = (_front ? 0 : 3) + _wf;
     var _uv = sprite_get_uvs(_spr, _sub);
-    var _x1 = x - lengthdir_x(24, _va), _y1 = y - lengthdir_y(24, _va), _x2 = x + lengthdir_x(24, _va), _y2 = y + lengthdir_y(24, _va);
-    var _H = 96;
+    // 0.7.3: sitting partner = lower, slightly wider billboard (feet stay on the floor)
+    var _hw = _M.psit ? 27 : 24;
+    var _x1 = x - lengthdir_x(_hw, _va), _y1 = y - lengthdir_y(_hw, _va), _x2 = x + lengthdir_x(_hw, _va), _y2 = y + lengthdir_y(_hw, _va);
+    var _H = _M.psit ? 58 : 96;
     shader_set(TransparencyShader);
     var _vb = vertex_create_buffer();
     vertex_begin(_vb, global.VertexFormat);
@@ -688,7 +691,7 @@ function coop_more_step()
             _B.aggro = 0; _B.pDeadSeen = false; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
             _E.partnerEr = -1; _E.botBuyDone = false;
         }
-        if (coop_is_maze_room(room)) { _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
+        if (coop_is_maze_room(room)) { _M.sit = false; _M.psit = 0; _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
         _X.prevRoom = room;
     }
     // money in the snapshot-free channel: send on change
@@ -747,6 +750,8 @@ function coop_more_bot()
         if (_c.connected && coop_tb_sync_room())
         {
             if (coop_is_host()) { var _l = coop_tb_list(); for (var k = 0; k < array_length(_l); k++) { if (coop_tb_can(_l[k])) { coop_tb_send_press(_l[k]); coop_tb_forward_inst(_l[k]); break; } } }
+            // 0.7.3 bot only: a client box the host never shows (different story flags in the test save) would block the client bot forever
+            else if (_M.botFace >= 0 && current_time - global.CoopS3.mzIn > 25000) { coop_bot_textbox_forward(); }
         }
         else { coop_bot_textbox_forward(); }
     } }
@@ -849,4 +854,33 @@ function coop_more_draw()
     {
         draw_set_halign(fa_center); draw_set_color(c_yellow); draw_text(_gw / 2, 100, "Waiting for your partner to leave the maze..."); draw_set_halign(fa_left); draw_set_color(c_white);
     }
+}
+
+
+// ================= 0.7.3: sit / crouch in the 3D maze =================
+// Patched into oCamera3DMaze Step: Crouching = (coop_maze_crouch(<original Sneak hold>) && no lock-on).
+// C or Ctrl toggles sitting; the original held Sneak key still works. Uses the original crouch height / walls.
+function coop_maze_crouch(_held)
+{
+    var _M = global.CoopM;
+    if (!instance_exists(oTextBox) && (keyboard_check_pressed(ord("C")) || keyboard_check_pressed(vk_control)))
+    {
+        _M.sit = !_M.sit;
+        coop_log("MAZE: I " + (_M.sit ? "sat down" : "stood up") + " (C/Ctrl)");
+    }
+    if (_M.botSit >= 0 && instance_exists(oCamera3DMaze))
+    {
+        var _sec = (current_time - global.CoopS3.mzIn) / 1000;
+        if (!_M.botSitDone && _sec >= _M.botSit) { _M.botSitDone = true; _M.sit = true; _M.botSitUntil = current_time + 15000; coop_log("bot: FORCED sit for 15 s (-coop-botsit)"); }
+        if (_M.botSitDone && _M.sit && current_time > _M.botSitUntil) { _M.sit = false; coop_log("bot: stand up"); }
+        if (_M.botSitDone && !_M.sitShot && current_time > _M.botSitUntil - 7000) { _M.sitShot = true; global.CoopMore.shotReq = "maze_sit"; global.CoopMore.shotAt = current_time; }
+    }
+    return _held || _M.sit;
+}
+
+function coop_maze_me_sitting()
+{
+    if (!instance_exists(oCamera3DMaze)) { return 0; }
+    var _c = oCamera3DMaze;
+    return (_c.HeightOffset < (_c.CustomHeight + _c.CustomSneakHeight) / 2) ? 1 : 0;
 }
