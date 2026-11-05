@@ -144,7 +144,7 @@ function coop_set_select()
         case 3: _g.bossShared = !_g.bossShared; break;
         case 4: _g.maze = !_g.maze; break;
         case 5: _g.specReward = (_g.specReward == 100) ? 50 : ((_g.specReward == 50) ? 0 : 100); break;
-        case 6: _g.mask = (_g.mask + 1) mod 3; break;
+        case 6: _g.mask = (_g.mask + 1) mod 3; if (_g.partnerMaskRaw >= 0 && _g.mask == _g.partnerMaskRaw) { _g.mask = (_g.mask + 1) mod 3; } break; // 0.7.3: never the partner's skin (same difficulty for both)
         case 7: _g.devMode = !_g.devMode; break;
         default: goto_menu("Co-op", 4); return;
     }
@@ -228,8 +228,10 @@ function coop_more_packet(_t, _m)
     var _g = global.CoopCfg, _B = global.CoopB, _M = global.CoopM, _E = global.CoopE;
     switch (_t)
     {
+        case "salv": coop_salv_in(_m); break;
         case "cfg":
             _g.partnerMaskRaw = clamp(_m.mask, 0, 2); // never our own mask
+            if (coop_is_client() && _g.mask == _g.partnerMaskRaw) { _g.mask = (_g.mask + 1) mod 3; coop_log("SKIN: same skin as the host -> mine is now " + coop_mask_name(_g.mask)); coop_send(coop_cfg_packet_safe()); }
             if (coop_is_client())
             {
                 _g.repel = _m.repel; _g.revives = _m.revives; _g.jd = _m.jd; _g.bossShared = _m.bossShared; _g.maze = _m.maze; _g.specReward = _m.specReward; _g.fromHost = true;
@@ -883,4 +885,35 @@ function coop_maze_me_sitting()
     if (!instance_exists(oCamera3DMaze)) { return 0; }
     var _c = oCamera3DMaze;
     return (_c.HeightOffset < (_c.CustomHeight + _c.CustomSneakHeight) / 2) ? 1 : 0;
+}
+
+// ===== 0.7.3: maze salvage pick is shared WITHOUT the cutscene (partner gets the same animatronic + an icon top-right) =====
+global.CoopSalv = { icon: -1, iconAt: 0, inN: 0, outN: 0 };
+function coop_cfg_packet_safe() { return { t: "cfg", repel: global.CoopCfg.repel, revives: global.CoopCfg.revives, jd: global.CoopCfg.jd, bossShared: global.CoopCfg.bossShared, maze: global.CoopCfg.maze, specReward: global.CoopCfg.specReward, mask: global.CoopCfg.mask, diff: -1 }; }
+function coop_salv_out(_id)
+{
+    if (!global.Coop.connected || !coop_is_maze_room(room)) { return; }
+    global.CoopSalv.outN++;
+    coop_send({ t: "salv", id: _id });
+    coop_log("SALV: I salvaged " + string(_id) + " -> partner gets it (no cutscene)");
+}
+function coop_salv_in(_m)
+{
+    var _id = real(_m.id);
+    if (!variable_global_exists("SalvagesCurrent") || array_contains(global.SalvagesCurrent, _id)) { coop_log("SALV: partner salvaged " + string(_id) + " (already mine)"); return; }
+    array_push(global.SalvagesCurrent, _id);
+    array_push(global.AllTimeSalvages, _id);
+    global.SalvageRecord[_id]++;
+    with (oInteraction_Animatronic) { if (variable_instance_exists(id, "AnimatronicID") && AnimatronicID == _id) { Text = "Destroy"; } }
+    global.CoopSalv.icon = _id; global.CoopSalv.iconAt = current_time; global.CoopSalv.inN++;
+    coop_log("SALV: partner salvaged " + string(_id) + " -> added here silently (" + string(array_length(global.SalvagesCurrent)) + "/" + string(global.SalvageQuota) + ")");
+}
+function coop_salv_draw()
+{
+    var _S = global.CoopSalv;
+    if (_S.icon < 0 || current_time - _S.iconAt > 6000 || !coop_is_maze_room(room)) { return; }
+    var _gw = display_get_gui_width(), _t = "PARTNER SALVAGED  " + string(array_length(global.SalvagesCurrent)) + "/" + string(global.SalvageQuota);
+    var _w = string_width(_t) + 12;
+    coop_ui_panel(_gw - _w - 4, 26, _gw - 4, 42);
+    draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(make_color_rgb(244, 240, 232)); draw_text(_gw - _w + 2, 27, _t); draw_set_color(c_white);
 }

@@ -137,6 +137,11 @@ if (stage == "full")
     if (stage == "full" || overlay)
         g.QueueFindReplace(mz, mzFind, "var Crouching = (coop_maze_crouch(input_check(UnknownEnum.Value_26)) && LockOnTarget == -4)");
 }
+if (stage == "full" || overlay)
+{
+    // 0.7.3: maze salvage -> partner gets it silently
+    g.QueueFindReplace("gml_GlobalScript_TextboxScripts", "array_push(global.SalvagesCurrent, other.SalvageID);", "array_push(global.SalvagesCurrent, other.SalvageID);\n                coop_salv_out(other.SalvageID);");
+}
 var res = g.Import();
 Console.WriteLine("[apply] import done");
 

@@ -262,6 +262,7 @@ function coop_maze_look_step()
 function coop_maze_tb_open(_key, _px, _py)
 {
     var _c = global.Coop;
+    return; // 0.7.3: maze dialogs / shop are LOCAL (only the player who started them sees them)
     if (!_c.connected || !global.CoopCfg.maze || !coop_is_maze_room(room)) { return; }
     coop_send({ t: "mztb", k: _key, rm: room_get_name(room), qx: _px, qy: _py });
     coop_log("MAZE: I opened dialog '" + string(_key) + "' -> partner sees it too");

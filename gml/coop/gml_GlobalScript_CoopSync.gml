@@ -301,7 +301,7 @@ function coop_tb_list()
 }
 
 // 0.6.3: maze dialogs are shared too (opened for both by coop_maze_tb_open, pages turned by either player)
-function coop_tb_sync_room() { return room != Office && (!coop_is_maze_room(room) || (variable_global_exists("CoopCfg") && global.CoopCfg.maze)); }
+function coop_tb_sync_room() { return room != Office && !coop_is_maze_room(room); } // 0.7.3: maze dialogs local
 
 // a local press on a dialog: tell the partner which page and what it did (reveal / advance)
 function coop_tb_send_press(_i)

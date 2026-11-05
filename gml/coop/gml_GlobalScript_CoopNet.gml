@@ -179,6 +179,8 @@ function coop_pause_packet(arg0)
                 }
             }
         }
+        // 0.7.3: the local pause menu (oTitleMenu) must close with the remote resume, else it stays on screen while the game runs
+        if (_unpaused && room != TitleScreenMap && instance_exists(oTitleMenu)) { with (oTitleMenu) { instance_destroy(); } }
         if (!_unpaused)
         {
             _p.opening = false;
@@ -633,6 +635,7 @@ function coop_draw_gui()
     coop_warn_draw();
     coop_feat_draw();
     coop_more_draw();
+    coop_salv_draw();
     coop_draw_scene_participants();
     coop_sync_draw();
     coop_s3_draw();
