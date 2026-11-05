@@ -40,18 +40,18 @@ function coop_more_parse_args()
     {
         var _p = parameter_string(i);
         var _v = (i + 1 < _n) ? parameter_string(i + 1) : "";
-        if (_p == "-coop-botboss") { i++; _B.botBoss = real(_v); }
-        else if (_p == "-coop-botbossdmg") { i++; _B.botBossDmg = real(_v); }
-        else if (_p == "-coop-botscrap") { i++; _B.botScrap = real(_v); }
-        else if (_p == "-coop-botmaze") { i++; _M.botMaze = real(_v); }
-        else if (_p == "-coop-botmazeapproach") { i++; _M.botApproach = real(_v); }
-        else if (_p == "-coop-botmazeface") { i++; _M.botFace = real(_v); }
-        else if (_p == "-coop-botmazeexit") { i++; _M.botExit = real(_v); }
-        else if (_p == "-coop-botmazespawn") { i++; _M.botSpawn = real(_v); }
-        else if (_p == "-coop-botbuy") { i++; _E.botBuy = real(_v); }
-        else if (_p == "-coop-botadvance") { i++; global.CoopMore.botAdv = real(_v); }
-        else if (_p == "-coop-botsettings") { i++; global.CoopMore.botSet = real(_v); }
-        else if (_p == "-coop-mask") { i++; global.CoopCfg.mask = clamp(real(_v), 0, 2); global.CoopCfg.loaded = true; }
+        if (_p == "-coop-botboss") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _B.botBoss = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botbossdmg") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _B.botBossDmg = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botscrap") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _B.botScrap = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmaze") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botMaze = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmazeapproach") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botApproach = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmazeface") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botFace = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmazeexit") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botExit = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botmazespawn") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _M.botSpawn = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botbuy") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _E.botBuy = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botadvance") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } global.CoopMore.botAdv = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botsettings") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } global.CoopMore.botSet = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-mask") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } global.CoopCfg.mask = clamp(coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0), 0, 2); global.CoopCfg.loaded = true; }
     }
 }
 
@@ -685,7 +685,7 @@ function coop_spec_reward(_before)
 function coop_econ_draw()
 {
     var _E = global.CoopE, _c = global.Coop;
-    if (!_c.connected || room == Office || room == GameOver || coop_is_maze_room(room) || room == StartupRoom || room == WarningScreen) { return; }
+    if (!_c.connected || room == Office || room == GameOver || coop_is_maze_room(room) || room == StartupRoom || room == WarningScreen || coop_sync_is_menu(room) || instance_exists(oTitleMenu)) { return; } // 0.7.6 S7-3: never over title menus / Co-op Settings
     if (_E.pMoney < 0 && array_length(_E.pBuys) == 0) { return; }
     if (room == NightOpening || instance_exists(oTextBox) || instance_exists(oTextBox_Fredbear)) { return; } // 0.6.2: not over the night card portraits / story
     var _gw = display_get_gui_width();

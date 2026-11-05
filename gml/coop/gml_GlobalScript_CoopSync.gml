@@ -25,10 +25,10 @@ function coop_sync_parse_args()
         var _p = parameter_string(i);
         var _v = (i + 1 < _n) ? parameter_string(i + 1) : "";
         if (_p == "-coop-botmenu") { i++; _S.botMenu = _v; }              // FLAGGED test bot: new[:diff] | cont | custom | extras | endless | 4ld
-        else if (_p == "-coop-botmenuat") { i++; _S.botMenuAt = real(_v); } // ms after the main menu appears
-        else if (_p == "-coop-botpress") { i++; _S.botPress = real(_v); }   // FLAGGED: "press" the dialog key every N ms (same path as a real key press)
-        else if (_p == "-coop-botpressmax") { i++; _S.botPressMax = real(_v); }
-        else if (_p == "-coop-botquit") { i++; _S.botQuit = real(_v); }      // FLAGGED: quit to menu after N s in the Office
+        else if (_p == "-coop-botmenuat") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.botMenuAt = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); } // ms after the main menu appears
+        else if (_p == "-coop-botpress") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.botPress = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }   // FLAGGED: "press" the dialog key every N ms (same path as a real key press)
+        else if (_p == "-coop-botpressmax") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.botPressMax = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }
+        else if (_p == "-coop-botquit") { if (_v != "" && string_char_at(_v, 1) != "-") { i++; } _S.botQuit = coop_arg_num((_v != "" && string_char_at(_v, 1) != "-") ? _v : "", 0); }      // FLAGGED: quit to menu after N s in the Office
     }
 }
 

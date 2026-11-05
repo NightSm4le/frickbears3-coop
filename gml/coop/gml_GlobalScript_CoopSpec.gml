@@ -30,10 +30,10 @@ function coop_spec_parse_args()
     for (var i = 0; i < _n; i++)
     {
         var _p = parameter_string(i);
-        if (_p == "-coop-botlag" && i + 1 < _n) { i++; _s.botLag = real(parameter_string(i)); }
-        else if (_p == "-coop-bothelp" && i + 1 < _n) { i++; _s.botHelp = real(parameter_string(i)); }
-        else if (_p == "-coop-botdie" && i + 1 < _n) { i++; _s.botDie = real(parameter_string(i)); }
-        else if (_p == "-coop-budget" && i + 1 < _n) { i++; _s.budget = real(parameter_string(i)); }
+        if (_p == "-coop-botlag" && i + 1 < _n) { i++; _s.botLag = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-bothelp" && i + 1 < _n) { i++; _s.botHelp = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botdie" && i + 1 < _n) { i++; _s.botDie = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-budget" && i + 1 < _n) { i++; _s.budget = coop_arg_num(parameter_string(i), 0); }
     }
 }
 

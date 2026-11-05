@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 7,
-    modver: "0.7.5",
+    modver: "0.7.6",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -211,17 +211,17 @@ function coop_parse_args()
         var _p = parameter_string(i);
         if (_p == "-coop-host") { _c.mode = "want_host"; }
         else if (_p == "-coop-join") { _c.mode = "want_join"; if (i + 1 < _n && string_char_at(parameter_string(i + 1), 1) != "-") { i++; _c.ip = parameter_string(i); } }
-        else if (_p == "-coop-port" && i + 1 < _n) { i++; _c.port = real(parameter_string(i)); }
+        else if (_p == "-coop-port" && i + 1 < _n) { i++; _c.port = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-bot") { _c.bot = true; }
-        else if (_p == "-coop-autonight" && i + 1 < _n) { i++; _c.autoNight = real(parameter_string(i)); }
+        else if (_p == "-coop-autonight" && i + 1 < _n) { i++; _c.autoNight = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-log" && i + 1 < _n) { i++; _c.logFile = parameter_string(i); }
         else if (_p == "-coop-botping") { _c.botPing = true; }
-        else if (_p == "-coop-botdoors" && i + 1 < _n) { i++; _c.botDoors = real(parameter_string(i)); }
+        else if (_p == "-coop-botdoors" && i + 1 < _n) { i++; _c.botDoors = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botendless") { _c.botEndless = true; }
-        else if (_p == "-coop-botendlessround" && i + 1 < _n) { i++; _c.botEndless = true; _c.botEndlessRound = max(1, real(parameter_string(i))); }
+        else if (_p == "-coop-botendlessround" && i + 1 < _n) { i++; _c.botEndless = true; _c.botEndlessRound = max(1, coop_arg_num(parameter_string(i), 0)); }
         else if (_p == "-coop-botphony") { _c.botPhony = true; }
-        else if (_p == "-coop-botcustom" && i + 1 < _n) { i++; _c.botCustom = real(parameter_string(i)); }
-        else if (_p == "-coop-botwin" && i + 1 < _n) { i++; _c.botWin = real(parameter_string(i)); }
+        else if (_p == "-coop-botcustom" && i + 1 < _n) { i++; _c.botCustom = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botwin" && i + 1 < _n) { i++; _c.botWin = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botai" && i + 1 < _n)
         {
             i++;
@@ -229,11 +229,11 @@ function coop_parse_args()
             for (var k = 0; k < array_length(_parts); k++) { var _kv = string_split(_parts[k], "="); if (array_length(_kv) == 2) { array_push(_c.botAI, [real(_kv[0]), real(_kv[1])]); } }
         }
         else if (_p == "-coop-botcam") { _c.botCam = true; }
-        else if (_p == "-coop-botdrop" && i + 1 < _n) { i++; _c.botDrop = real(parameter_string(i)); } // 0.6.2: client fakes a lost host after N s in the Office
-        else if (_p == "-coop-botkick" && i + 1 < _n) { i++; _c.botKick = real(parameter_string(i)); }
-        else if (_p == "-coop-botlure" && i + 1 < _n) { i++; _c.botLure = real(parameter_string(i)); }
-        else if (_p == "-coop-botrepel" && i + 1 < _n) { i++; global.CoopA.repelChance = real(parameter_string(i)); }
-        else if (_p == "-coop-botlurechance" && i + 1 < _n) { i++; global.CoopA.lureChance = real(parameter_string(i)); }
+        else if (_p == "-coop-botdrop" && i + 1 < _n) { i++; _c.botDrop = coop_arg_num(parameter_string(i), 0); } // 0.6.2: client fakes a lost host after N s in the Office
+        else if (_p == "-coop-botkick" && i + 1 < _n) { i++; _c.botKick = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botlure" && i + 1 < _n) { i++; _c.botLure = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botrepel" && i + 1 < _n) { i++; global.CoopA.repelChance = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botlurechance" && i + 1 < _n) { i++; global.CoopA.lureChance = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botshots" && i + 1 < _n) { i++; _c.botShots = string_split(parameter_string(i), ","); }
     }
     coop_spec_parse_args();
@@ -691,4 +691,13 @@ function coop_bot_drop_due(_c)
 {
     if (!variable_struct_exists(_c, "botDropAt") || _c.botDropAt < 0) { _c.botDropAt = current_time; }
     return current_time - _c.botDropAt >= _c.botDrop * 1000;
+}
+
+// 0.7.6 (S7-2): safe numeric parse for -coop-* flags. Missing/empty/non-numeric value -> default, never a Code Error.
+function coop_arg_num(_s, _def)
+{
+    if (!is_string(_s) || _s == "") { return _def; }
+    var _r = _def;
+    try { _r = real(_s); } catch (_e) { _r = _def; }
+    return _r;
 }

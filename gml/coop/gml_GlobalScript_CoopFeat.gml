@@ -27,14 +27,14 @@ function coop_feat_parse_args()
     {
         var _p = parameter_string(i);
         if (_p == "-coop-savetag" && i + 1 < _n) { i++; _f.saveTagArg = "_" + string_lettersdigits(parameter_string(i)); }
-        else if (_p == "-coop-unlockall") { _f.unlockAll = true; } // 0.6.2 tester flag: Extras / Custom Night / bosses unlocked in the CO-OP save only
-        else if (_p == "-coop-botmark" && i + 1 < _n) { i++; _f.botMark = real(parameter_string(i)); }
-        else if (_p == "-coop-botrevive" && i + 1 < _n) { i++; _f.botRevive = real(parameter_string(i)); }
-        else if (_p == "-coop-botjd" && i + 1 < _n) { i++; _f.botJd = real(parameter_string(i)); }
-        else if (_p == "-coop-botjdclose" && i + 1 < _n) { i++; _f.botJdClose = real(parameter_string(i)); }
-        else if (_p == "-coop-botwarnself" && i + 1 < _n) { i++; _f.botWarnSelf = real(parameter_string(i)); }
-        else if (_p == "-coop-botrlure" && i + 1 < _n) { i++; _f.botRlure = real(parameter_string(i)); }
-        else if (_p == "-coop-botspecmark" && i + 1 < _n) { i++; _f.botSpecMark = real(parameter_string(i)); }
+        else if (_p == "-coop-unlockall") { _f.unlockAll = true; if (_f.saveTagArg == "") { _f.saveTagArg = "_unlockall"; } } // 0.6.2 tester flag: Extras / Custom Night / bosses unlocked in the CO-OP save only
+        else if (_p == "-coop-botmark" && i + 1 < _n) { i++; _f.botMark = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botrevive" && i + 1 < _n) { i++; _f.botRevive = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botjd" && i + 1 < _n) { i++; _f.botJd = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botjdclose" && i + 1 < _n) { i++; _f.botJdClose = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botwarnself" && i + 1 < _n) { i++; _f.botWarnSelf = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botrlure" && i + 1 < _n) { i++; _f.botRlure = coop_arg_num(parameter_string(i), 0); }
+        else if (_p == "-coop-botspecmark" && i + 1 < _n) { i++; _f.botSpecMark = coop_arg_num(parameter_string(i), 0); }
     }
 }
 
