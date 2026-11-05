@@ -68,7 +68,7 @@ if (stage == "full")
     need(sync.Contains("tbreq") && sync.Contains("coop_tb_request(arg1)"), "host-authoritative dialogue input missing");
     need(sync.Contains("method(id, game_text)"), "dialogue branch does not bind game_text to its textbox");
     var moreChecks = D("gml_GlobalScript_CoopMore");
-    need(moreChecks.Contains("SCRAPTRAP: ") && moreChecks.Contains("instance_find(oCamera3DMaze"), "shared task explanation or guarded maze HUD missing");
+    need(moreChecks.Contains("SCRAPTRAP  done ") && moreChecks.Contains("Partner finished: ") && moreChecks.Contains("instance_find(oCamera3DMaze"), "shared task explanation or guarded maze HUD missing");
     var ui = D("gml_GlobalScript_CoopUI");
     need(ui.Contains("coop_draw_scene_participants") && (ui.Contains("P\" + string(_me)") || ui.Contains("PLAYER \" + string(_me)")), "co-op participants are not shown during story dialogs");
     need(ui.Contains("function coop_draw_night_participants()") && ui.Contains("coop_scene_mod_sprite(_otherName)"), "both players are not drawn on the night location card");
@@ -108,6 +108,11 @@ if (stage == "full")
     // 0.8.2 (S14-1 / S14-2)
     need(D("gml_Object_oCoopNet_Step_0").Contains("officeAt = current_time") && D("gml_Object_oCoopNet_Step_0").Contains("revivedEnter"), "S14-1 officeAt / botdie reset order missing");
     need(D("gml_GlobalScript_CoopSpec").Contains("botDieAt") && D("gml_GlobalScript_CoopSpec").Contains("forceJs") && D("gml_GlobalScript_CoopSpec").Contains("jumpscare(120"), "S14-2 local Salvage botdie missing");
+    // 0.8.3 (UX-S16)
+    need(D("gml_GlobalScript_CoopSpec").Contains("function coop_spec_dying_draw(") && D("gml_GlobalScript_CoopSpec").Contains("armedAt") && net.Contains("coop_spec_dying_draw()") && net.Contains("room == Office && global.CoopS.armed"), "S16-B2/B3 dying overlay / alive latch missing");
+    need(net.Contains("PAUSE: refused - dialog open") && more.Contains("Finish the dialog first"), "S16-M2 maze dialog pause guard missing");
+    need(D("gml_GlobalScript_CoopUI").Contains("Co-op HUD hidden (Tab to show)") && D("gml_Object_oCoopNet_Step_0").Contains("F8: co-op menu is closed during a night") && D("gml_Object_oCoopNet_Step_0").Contains("hintSeen"), "S16-O1/O2 HUD hint / key feedback missing");
+    need(net.Contains("modver: \"0.8.3\""), "modver not 0.8.3");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");

@@ -39,7 +39,7 @@ if (room != _c.prevRoom)
     if (_c.prevRoom == Office) { coop_anim_night_end(); }
     if (room == NightOpening) { coop_score_reset(); BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0 fix: stale 6AM flag from the previous night
     if (room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0: Endless rounds skip NightOpening
-    if (room == Office) { global.CoopMore.officeAt = current_time; coop_anim_night_start(); coop_feat_office_enter(); global.CoopS.hintUntil = current_time + 8000; if (!global.CoopF.revivedEnter) { global.CoopS.botDieDone = false; } global.CoopS.botHelpStep = 0; } // 0.8.2 (S14-1): officeAt before coop_spec_step; one botdie per night (not again after a revive)
+    if (room == Office) { global.CoopMore.officeAt = current_time; coop_anim_night_start(); coop_feat_office_enter(); if (!global.CoopS.hintSeen) { global.CoopS.hintSeen = true; global.CoopS.hintUntil = current_time + 6000; } /* 0.8.3 (UX-S16-O1): key hint once per session, then on Tab */ if (!global.CoopF.revivedEnter) { global.CoopS.botDieDone = false; } global.CoopS.botHelpStep = 0; } // 0.8.2 (S14-1): officeAt before coop_spec_step; one botdie per night (not again after a revive)
     if (coop_is_host() && _c.connected && room == NightOpening) { coop_send(coop_night_payload()); }
     else if (coop_is_host() && _c.connected && room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { coop_send(coop_night_payload()); coop_log("ENDLESS: night payload sent on Office entry (round " + string(global.EndlessRound) + ")"); }
     _c.prevRoom = room;
@@ -168,7 +168,9 @@ if (_c.bot)
     }
 }
 // --- menu (F8, not during a night) ---
-if (keyboard_check_pressed(vk_f8) && room != Office && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op")) { _c.menuOpen = !_c.menuOpen; _c.focus = 0; }
+if (keyboard_check_pressed(vk_f8) && room != Office && !(instance_exists(oTitleMenu) && oTitleMenu.CurMenu == "Co-op")) { _c.menuOpen = !_c.menuOpen; _c.focus = 0; coop_log("F8: co-op menu " + (_c.menuOpen ? "open" : "closed")); }
+// 0.8.3 (UX-S16-O2): F8 does nothing in the Office (no connect menu mid-night) - say so instead of silently ignoring it
+else if (keyboard_check_pressed(vk_f8) && room == Office) { coop_alert("F8: co-op menu is closed during a night | Tab: hide/show co-op HUD | F9: move it", c_ltgray, undefined); global.CoopS.hintUntil = current_time + 4000; }
 if (_c.menuOpen && room == Office) { _c.menuOpen = false; }
 if (_c.menuOpen)
 {

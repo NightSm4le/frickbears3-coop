@@ -27,8 +27,8 @@ function coop_mask_name(_i) { var _n = ["freddy", "bonnie", "chica"]; return _n[
 
 global.CoopArt = { tried: false, spr: {} };
 global.CoopB = { hpKeep: -1, deadDmg: 0, restoreHP: -1, reAggro: 0, lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, dmgIn: 0, aggro: 0, pDeadSeen: false, meDeadSeen: false,
-    botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapIn: 0, scrapOut: 0, logAt: 0 };
-global.CoopM = { sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
+    botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapTotal: 0, scrapIn: 0, scrapOut: 0, logAt: 0 };
+global.CoopM = { pauseBlockAt: -100000, sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
     caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
     logAt: 0, followed: false, shotAt: 0, targetLog: "", sit: false, psit: 0, botSit: -1, botSitDone: false, botSitUntil: 0, botSitOn: false, mzRoom: -1, mzAt: 0, sitShot: false, sitLog: -1, botSitWait: false, botSitWaitAt: 0 };
 global.CoopE = { pMoney: -1, pBuys: [], buysIn: 0, buysOut: 0, partnerEr: -1, botBuy: -1, botBuyDone: false, shown: 0 };
@@ -294,11 +294,13 @@ function coop_more_packet(_t, _m)
             coop_boss_aggro(_m.why, false);
             return true;
         case "stasks": // client: host's Scraptrap task list (same titles/durations on both sides)
-            if (coop_is_client() && instance_exists(oScraptrap)) { _B.scrapGotAt = current_time; oScraptrap.Tasks = _m.tasks; _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list from host (" + string(array_length(_m.tasks)) + " tasks)"); }
+            if (coop_is_client() && instance_exists(oScraptrap)) { _B.scrapGotAt = current_time; oScraptrap.Tasks = _m.tasks; _B.scrapTotal = array_length(_m.tasks); _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list from host (" + string(array_length(_m.tasks)) + " tasks)"); }
             return true;
         case "stask": // partner finished a task
             _B.scrapIn++;
             coop_scrap_remove(_m.title);
+            // 0.8.3 (UX-S16-S1): short toast with the task's name instead of a permanent egocentric counter
+            if (room == Office && instance_exists(oScraptrap)) { coop_alert("Partner finished: " + string(_m.title), c_yellow, undefined); }
             return true;
         case "mz": // partner maze position
             _M.px = _m.x; _M.py = _m.y; _M.pdir = _m.d; _M.pmove = _m.mv; _M.pAlive = _m.al && !(current_time - _M.pCaughtAt < 2000); _M.prm = _m.rm; _M.pAt = current_time;
@@ -418,8 +420,8 @@ function coop_scrap_remove(_title)
 function coop_scrap_step()
 {
     var _B = global.CoopB;
-    if (!instance_exists(oScraptrap)) { _B.scrapSent = false; _B.scrapTitles = []; return; }
-    if (coop_is_host() && !_B.scrapSent) { _B.scrapSent = true; coop_send({ t: "stasks", tasks: oScraptrap.Tasks }); _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list sent (" + string(array_length(_B.scrapTitles)) + ")"); return; }
+    if (!instance_exists(oScraptrap)) { _B.scrapSent = false; _B.scrapTitles = []; _B.scrapTotal = 0; return; }
+    if (coop_is_host() && !_B.scrapSent) { _B.scrapSent = true; _B.scrapTotal = array_length(oScraptrap.Tasks); coop_send({ t: "stasks", tasks: oScraptrap.Tasks }); _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list sent (" + string(array_length(_B.scrapTitles)) + ")"); return; }
     var _now = coop_scrap_titles();
     if (array_length(_now) < array_length(_B.scrapTitles))
     {
@@ -883,12 +885,16 @@ function coop_more_draw()
         coop_ui_panel(_gw / 2 - 70, 48, _gw / 2 + 70, 62);
         draw_set_color(c_red); draw_set_halign(fa_center); draw_text(_gw / 2, 49, "SHARED BOSS HP " + string(max(0, round(_salvage.HP))) + "%  P" + string(_salvage.Phase) + (_B.aggro > 0 ? "  RAGE " + string(_B.aggro) : "")); draw_set_halign(fa_left);
     }
-    if (room == Office && _c.connected && _scraptrap != noone)
+    // 0.8.3 (UX-S16-S1/S2): one shared progress line, identical on both sides (total = list size when the host sent /
+    // the client received the task list, left = shared remaining tasks); only once the list was synced this night.
+    // Note: oScraptrap itself is spawned by the vanilla AI setup (e.g. Unlock All on Night 1), the mod does not add spawns.
+    if (room == Office && _c.connected && _scraptrap != noone && _B.scrapTotal > 0)
     {
         var _ty = (_salvage != noone && global.CoopCfg.bossShared) ? 64 : 48; // below the cam strip and alert banner
         // 0.6.4 (S3-4): with the cams up, centre it over the camera view (right of the cam map and clear of its corner marks)
         var _tx = (variable_global_exists("CamUp") && global.CamUp) ? round(_gw * 0.6875) : _gw / 2;
-        var _tt = "SCRAPTRAP: " + string(array_length(_scraptrap.Tasks)) + " tasks left | partner finished " + string(_B.scrapIn), _tw = string_width(_tt) / 2 + 4;
+        var _left = array_length(_scraptrap.Tasks), _tot = max(_B.scrapTotal, _left);
+        var _tt = "SCRAPTRAP  done " + string(_tot - _left) + "/" + string(_tot) + "  (" + string(_left) + " left)", _tw = string_width(_tt) / 2 + 4;
         coop_ui_panel(_tx - _tw, _ty, _tx + _tw, _ty + 14);
         draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_tx, _ty + 1, _tt); draw_set_halign(fa_left);
     }
@@ -902,6 +908,13 @@ function coop_more_draw()
         draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
         draw_text(26, 6, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(_mazeCam.x, _mazeCam.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
         draw_set_color(c_white);
+    }
+    // 0.8.3 (UX-S16-M2): ESC was refused because a dialog is open (see coop_pause_requested)
+    if (coop_is_maze_room(room) && current_time - _M.pauseBlockAt < 2500)
+    {
+        var _pt = "Finish the dialog first, then ESC to pause both games", _pw2 = string_width(_pt) / 2 + 6;
+        coop_ui_panel(_gw / 2 - _pw2, 26, _gw / 2 + _pw2, 41);
+        draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_gw / 2, 27, _pt); draw_set_halign(fa_left); draw_set_color(c_white);
     }
     if (room == SalvageResults && _M.waitShown)
     {

@@ -195,3 +195,16 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
   its Salvage) and calls `jumpscare(120, 0, Phase)` directly inside `with (oSalvage)` (no beartrap save). 4 s later a WARNING
   is logged if still alive.
 - proto 8 unchanged.
+
+## 0.8.3 (S16 human playtest UX)
+- S1/S2: `CoopB.scrapTotal` (host: `array_length(oScraptrap.Tasks)`, client: from `stasks`); strip "SCRAPTRAP  done X/Y (N left)"
+  identical on both sides, drawn only once `scrapTotal > 0` (the oScraptrap spawn itself stays vanilla). `stask` -> `coop_alert("Partner finished: ...")`.
+- B2: `coop_spec_dying_draw()` (Draw GUI End, after the Office overlay) while `CoopS.armed` in the Office: SPECTATING banner at once,
+  black card from +500 ms (`armedAt`) over jumpscare / red transition / death art until the GameOver room spectator view.
+- B3: `coop_alive()` false in the Office while armed -> snapshot alive=0 / `died` sent early -> partner pill DEAD/SPECTATING, not SEATED.
+  `armed` reset in `coop_anim_night_start`.
+- O1: key hint once per session (`CoopS.hintSeen`, 6 s), moved to the bottom band (`_gh-44`); re-shown 4 s after Tab show / F8 in the Office.
+- O2: Tab / F9 / F8 (Office) give `coop_alert` feedback.
+- M2: `coop_pause_requested(local)` refuses in a maze room while oTextBox exists (`CoopM.pauseBlockAt`, maze HUD message 2.5 s);
+  remote pause packets still open the menu. M1 (Rabbit/Purple crouch obstacle) skipped. M3 bot-only, no change.
+- proto 8 unchanged, modver 0.8.3.

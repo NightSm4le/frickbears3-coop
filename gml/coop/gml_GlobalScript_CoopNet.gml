@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 8,
-    modver: "0.8.2",
+    modver: "0.8.3",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -82,6 +82,14 @@ function coop_pause_requested(arg0)
     }
     if (arg0)
     {
+        // 0.8.3 (UX-S16-M2): in a co-op maze a LOCAL ESC while a dialog is open is refused (the shared pause menu drew over
+        // the textbox and both were unreadable). Finish the dialog, then pause. A partner's remote pause still opens.
+        if (global.Coop.connected && coop_is_maze_room(room) && instance_exists(oTextBox))
+        {
+            if (current_time - global.CoopM.pauseBlockAt > 2500) { coop_log("PAUSE: refused - dialog open in the maze"); }
+            global.CoopM.pauseBlockAt = current_time;
+            return false;
+        }
         _p.opening = true;
         return true;
     }
@@ -560,6 +568,9 @@ function coop_alive()
 {
     if (room == GameOver) { return false; }
     if (instance_exists(oJumpscareTransition)) { return false; }
+    // 0.8.3 (UX-S16-B3): a co-op death (spectator armed in count_jumpscare) is final for this Office visit - the partner
+    // must not see me as SEATED during the seconds of jumpscare/death art before the GameOver room
+    if (room == Office && global.CoopS.armed) { return false; }
     return true;
 }
 
@@ -660,6 +671,7 @@ function coop_draw_gui()
     coop_s3_draw();
     // --- partner mini-window + alerts (Office, connected): see CoopUI ---
     if (room == Office && _c.connected) { coop_draw_overlay(); }
+    coop_spec_dying_draw(); // 0.8.3 (UX-S16-B2): on top of every Office band
     if (!_c.menuOpen) { return; }
     var _gw = display_get_gui_width(), _gh = display_get_gui_height();
     var _x = _gw / 2 - 150, _y = _gh / 2 - 90;

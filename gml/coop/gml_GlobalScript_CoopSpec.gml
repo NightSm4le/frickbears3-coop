@@ -8,7 +8,7 @@
 // Help: G = give power, L = remote audio lure in partner's office. Small native buttons do the same.
 
 global.CoopS = {
-    spec: false, armed: false, skipped: false, killer: -1, specSince: 0, partnerDeadSince: -1,
+    spec: false, armed: false, armedAt: 0, skipped: false, killer: -1, specSince: 0, partnerDeadSince: -1,
     // receiver
     frameSurf: -1, fw: 0, fh: 0, framesIn: 0, lastFrameAt: 0, fpsT: 0, fpsN: 0, rfps: 0, inLevel: -1, ackQ: [], botLag: 0,
     // sender
@@ -16,7 +16,7 @@ global.CoopS = {
     lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 512, sending: false,
     rxBytesWin: 0, rxKbps: 0, rxRateAt: 0, lastFrameSize: 0,
     // help
-    cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0,
+    cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0, hintSeen: false,
     specGiveUsedKey: "", specGiveRecvKey: "", specGivePending: false, specGiveRequestKey: "",
     botHelp: -1, botHelpStep: 0, botHelpAt: 0, botDie: -1, botDieDone: false, botDieAt: 0, shotPend: "", shotAt: 0, specShot: false, btnShot: false,
     st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, warn: 0, lure: 0, giveIn: 0, warnIn: 0, lureIn: 0, refunds: 0 }
@@ -88,7 +88,7 @@ function coop_spec_skip_count(_id)
 {
     if (!coop_active() || room != Office || !coop_partner_alive_in_office()) { return false; }
     var _s = global.CoopS;
-    _s.armed = true; _s.skipped = true; _s.killer = _id; _s.st.skipped++;
+    _s.armed = true; _s.armedAt = current_time; _s.skipped = true; _s.killer = _id; _s.st.skipped++;
     coop_log("SPECTATOR: death by " + coop_anim_name(_id) + " NOT counted (partner alive) - no Deaths++, no save; Deaths=" + json_stringify(global.Deaths));
     return true;
 }
@@ -293,6 +293,32 @@ function coop_stream_on_frame(_b, _size)
         if (_s.inLevel != _lvl) { coop_log("stream: receiving level " + string(_lvl) + " " + string(_w) + "x" + string(_h) + " (" + string(_size) + " bytes/frame)"); _s.inLevel = _lvl; }
     }
     buffer_delete(_d);
+}
+
+// 0.8.3 (UX-S16-B2): between the (not counted) death and the GameOver room the Office still plays the jumpscare,
+// the red transition and the death art for a few seconds -> it read as a real Game Over / softlock. Right after the
+// hit, say SPECTATING and cover the death art with a clear "switching to your partner's camera" card.
+function coop_spec_dying_draw()
+{
+    var _s = global.CoopS;
+    if (room != Office || !_s.armed) { return; }
+    var _gw = display_get_gui_width(), _gh = display_get_gui_height(), _t = current_time - _s.armedAt;
+    var _a = clamp((_t - 500) / 400, 0, 0.94); // let the jumpscare hit land, then cover
+    if (_a > 0) { draw_set_alpha(_a); draw_set_color(c_black); draw_rectangle(0, 0, _gw, _gh, false); draw_set_alpha(1); }
+    coop_ui_panel(92, 2, _gw - 92, 16);
+    draw_set_color(((current_time div 600) mod 2) ? make_color_rgb(230, 120, 40) : c_white); draw_text(96, 3, "SPECTATING");
+    draw_set_color(c_white); draw_text(170, 3, "you died - death NOT counted, your partner is still alive");
+    if (_a > 0.3)
+    {
+        draw_set_halign(fa_center);
+        draw_set_alpha(min(1, _a + 0.1));
+        draw_set_color(make_color_rgb(230, 120, 40)); draw_text_transformed(_gw / 2, _gh / 2 - 30, "SPECTATING", 2, 2, 0);
+        draw_set_color(c_ltgray); draw_text(_gw / 2, _gh / 2 + 4, "Switching to your partner's camera...");
+        draw_text(_gw / 2, _gh / 2 + 20, "Game Over only if both die | 6 AM wins | partner can revive you");
+        draw_set_alpha(1); draw_set_halign(fa_left);
+    }
+    draw_set_color(c_white);
+    coop_draw_alerts();
 }
 
 // ---------- spectator view (Draw GUI End) ----------

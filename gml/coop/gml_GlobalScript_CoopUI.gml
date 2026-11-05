@@ -35,8 +35,19 @@ function coop_ui_keys()
     if (room != Office || !global.Coop.connected) { return; }
     if (variable_global_exists("DevMode") && global.DevMode) { return; } // Tab is a dev-mode key in the base game
     var _u = global.CoopUI;
-    if (keyboard_check_pressed(vk_tab)) { _u.show = !_u.show; coop_ui_save(); }
-    if (keyboard_check_pressed(vk_f9)) { _u.corner = (_u.corner + 1) mod 4; coop_ui_save(); }
+    // 0.8.3 (UX-S16-O2): every toggle is acknowledged on screen (alerts stay visible even with the HUD hidden)
+    if (keyboard_check_pressed(vk_tab))
+    {
+        _u.show = !_u.show; coop_ui_save();
+        coop_alert(_u.show ? "Co-op HUD shown (Tab to hide)" : "Co-op HUD hidden (Tab to show)", c_ltgray, undefined);
+        if (_u.show) { global.CoopS.hintUntil = current_time + 4000; }
+    }
+    if (keyboard_check_pressed(vk_f9))
+    {
+        _u.corner = (_u.corner + 1) mod 4; coop_ui_save();
+        var _cn = ["top-right", "top-left", "bottom-left", "bottom-right"];
+        coop_alert("Co-op HUD moved: " + _cn[_u.corner] + " (F9)", c_ltgray, undefined);
+    }
 }
 
 // 0 = compact panel, 1 = pill, 2 = hidden (alerts still drawn)
@@ -288,12 +299,15 @@ function coop_draw_overlay()
         draw_set_alpha(1);
     }
     // key hint for the first seconds of a night
+    // 0.8.3 (UX-S16-O1/B1): shown once per session (6 s) and after Tab/F8, in the bottom band above Power / Mute Call,
+    // so it no longer stacks with the boss HP / Scraptrap / role panels in the top third
     if (current_time < global.CoopS.hintUntil && coop_alive() && !(variable_struct_exists(global.CoopUI, "strip") && global.CoopUI.strip)) // 0.6.2: not over the cam map tabs
     {
         var _ht = "CO-OP: P ping G power L lure M mark V revive Tab hide F9 move";
         var _hw = string_width(_ht) + 10;
-        coop_ui_panel(_gw / 2 - _hw / 2, 66, _gw / 2 + _hw / 2, 80); // 0.7.5: top band (bottom is Phone Guy subtitles / Power / Mute Call)
-        draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, 67, _ht); draw_set_halign(fa_left); draw_set_alpha(1);
+        var _hy = _gh - 44;
+        coop_ui_panel(_gw / 2 - _hw / 2, _hy, _gw / 2 + _hw / 2, _hy + 14);
+        draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _hy + 1, _ht); draw_set_halign(fa_left); draw_set_alpha(1);
     }
     coop_draw_alerts();
 }
