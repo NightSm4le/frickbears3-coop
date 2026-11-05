@@ -288,14 +288,15 @@ function coop_spec_draw()
     var _view = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "OFFICE";
     if (coop_partner_get("mk", 0)) { _view = "MASK"; } if (coop_partner_get("pu", 0)) { _view = "PANEL"; }
     // 0.7.4: bar at the bottom (top-left is the game's clock / night box)
-    var _by = _gh - 15;
-    coop_ui_panel(0, _by, _gw - 1, _gh - 1);
-    draw_set_color(((current_time div 600) mod 2) ? make_color_rgb(230, 120, 40) : c_white); draw_text(4, _by + 1, "SPECTATING PARTNER");
-    coop_ui_panel(2, _by - 60, 54, _by - 2);
-    coop_art_partner_portrait(4, _by - 58, 48, 1);
-    draw_set_color(c_white); draw_text(6, _by - 16, "P" + string(coop_partner_slot()));
+    // 0.7.5: top-centre strip between the clock box and Tokens (bottom is the spectator footer)
+    var _by = 2;
+    coop_ui_panel(92, _by, _gw - 92, _by + 14);
+    draw_set_color(((current_time div 600) mod 2) ? make_color_rgb(230, 120, 40) : c_white); draw_text(96, _by + 1, "SPECTATING");
+    coop_ui_panel(_gw - 58, 26, _gw - 4, 84);
+    coop_art_partner_portrait(_gw - 56, 28, 48, 1);
+    draw_set_color(c_white); draw_text(_gw - 54, 72, "P" + string(coop_partner_slot()));
     draw_set_color(c_white);
-    draw_text(140, _by + 1, string(_hr) + " AM   power " + string(floor(max(_pw, 0))) + "%   doors " + (coop_partner_get("d0", 0) ? "L" : "-") + (coop_partner_get("d1", 0) ? "R" : "-") + "   " + _view);
+    draw_text(170, _by + 1, string(_hr) + " AM   power " + string(floor(max(_pw, 0))) + "%   doors " + (coop_partner_get("d0", 0) ? "L" : "-") + (coop_partner_get("d1", 0) ? "R" : "-") + "   " + _view);
     draw_set_color(c_ltgray);
     var _age = current_time - _s.lastFrameAt;
     var _gr = coop_spec_give_button_rect(), _gkey = coop_spec_round_key();

@@ -692,9 +692,10 @@ function coop_econ_draw()
     var _t = "PARTNER $" + string(_E.pMoney);
     if (array_length(_E.pBuys) > 0) { _t += "  bought: "; for (var i = max(0, array_length(_E.pBuys) - 3); i < array_length(_E.pBuys); i++) { _t += _E.pBuys[i] + ((i < array_length(_E.pBuys) - 1) ? ", " : ""); } }
     var _w = string_width(_t) + 26;
-    coop_ui_panel(_gw - _w - 4, 4, _gw - 4, 21);
-    coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, _gw - _w, 5, 1);
-    draw_set_color(c_aqua); draw_text(_gw - _w + 18, 6, _t); draw_set_color(c_white);
+    var _ey = display_get_gui_height() - 40; // 0.7.5: bottom-left (top-right is the native money / Tokens box)
+    coop_ui_panel(4, _ey, 4 + _w, _ey + 17);
+    coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 7, _ey + 1, 1);
+    draw_set_color(c_aqua); draw_text(24, _ey + 2, _t); draw_set_color(c_white);
 }
 
 // ---------------- step / draw ----------------
@@ -864,12 +865,12 @@ function coop_more_draw()
     var _mazeCam = instance_find(oCamera3DMaze, 0);
     if (coop_is_maze_room(room) && _c.connected && _mazeCam != noone)
     {
-        coop_ui_panel(4, 24, 190, 42);
-        coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 6, 25, 1);
+        coop_ui_panel(4, 4, 190, 22); // 0.7.5: top-left corner is free in the maze (money box is top-right)
+        coop_art_icon(coop_partner_slot(), global.CoopCfg.partnerMask, 6, 5, 1);
         draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
-        if (_M.ghost && !_M.ghostDone) { draw_set_color(c_red); draw_text(6, 46, "CAUGHT - you are a ghost until your partner leaves the maze"); }
+        if (_M.ghost && !_M.ghostDone) { draw_set_color(c_red); draw_text(6, 26, "CAUGHT - you are a ghost until your partner leaves the maze"); }
         draw_set_color(_M.sync ? (_M.pAlive ? c_lime : c_red) : c_gray);
-        draw_text(26, 26, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(_mazeCam.x, _mazeCam.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
+        draw_text(26, 6, _M.sync ? ("PARTNER " + (_M.pAlive ? string(round(point_distance(_mazeCam.x, _mazeCam.y, _M.px, _M.py) / 32)) + " m" : "CAUGHT")) : "partner not in this maze");
         draw_set_color(c_white);
     }
     if (room == SalvageResults && _M.waitShown)
@@ -934,7 +935,7 @@ function coop_salv_draw()
     if (_S.icon < 0 || current_time - _S.iconAt > 6000 || !coop_is_maze_room(room)) { return; }
     var _gw = display_get_gui_width(), _t = "PARTNER SALVAGED  " + string(array_length(global.SalvagesCurrent)) + "/" + string(global.SalvageQuota);
     var _w = string_width(_t) + 12;
-    coop_ui_panel(_gw - _w - 4, 26, _gw - 4, 42);
+    coop_ui_panel(_gw - _w - 4, 44, _gw - 4, 60); // 0.7.5: below the native money box
     draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(make_color_rgb(244, 240, 232)); draw_text(_gw - _w + 2, 27, _t); draw_set_color(c_white);
 }
 
@@ -966,12 +967,12 @@ function coop_boss_roles_draw()
     var _t2 = _dis ? "Keep Salvage looking at YOU - flash / lure, survive" : "Salvage is busy with P1 - attack now";
     var _t3 = "Boss HP is SHARED  |  boss attacks each player on their own screen";
     var _w = max(string_width(_t2), string_width(_t3)) + 16, _x = (_gw - _w) / 2;
-    coop_ui_panel(_x, 20, _x + _w, 70);
+    var _ry = 84; // 0.7.5: below SHARED BOSS HP / ping / key hint
+    coop_ui_panel(_x, _ry, _x + _w, _ry + 48);
     draw_set_halign(fa_center);
-    draw_set_color(_dis ? make_color_rgb(230, 120, 40) : make_color_rgb(120, 200, 90)); draw_text(_gw / 2, 23, _t1);
-    draw_set_color(c_white); draw_text(_gw / 2, 39, _t2);
-    draw_set_color(make_color_rgb(200, 196, 188)); draw_text(_gw / 2, 54, _t3);
+    draw_set_color(_dis ? make_color_rgb(230, 120, 40) : make_color_rgb(120, 200, 90)); draw_text(_gw / 2, _ry + 2, _t1);
+    draw_set_color(c_white); draw_text(_gw / 2, _ry + 17, _t2);
+    draw_set_color(make_color_rgb(200, 196, 188)); draw_text(_gw / 2, _ry + 32, _t3);
     var _hp = variable_instance_exists(oSalvage, "HP") ? oSalvage.HP : -1;
-    if (_hp >= 0) { coop_ui_panel(_x, 72, _x + _w, 82); draw_set_color(make_color_rgb(220, 70, 50)); draw_rectangle(_x + 2, 74, _x + 2 + (_w - 4) * clamp(_hp / 100, 0, 1), 80, false); }
     draw_set_halign(fa_left); draw_set_color(c_white);
 }

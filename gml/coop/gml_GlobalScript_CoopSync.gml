@@ -486,7 +486,7 @@ function coop_sync_draw()
     if (!(room == Office && _c.connected) && current_time - _S.noteAt < _S.noteMs) { _txt = _S.note; }
     if (_txt != "")
     {
-        var _tw = string_width(_txt) + 10, _bx = _gw / 2 - _tw / 2, _by = 26;
+        var _tw = string_width(_txt) + 10, _bx = _gw / 2 - _tw / 2, _by = _gh - 58; // 0.7.5: off menu titles (Extras / Custom Night)
         var _a = clamp((_S.noteMs - (current_time - _S.noteAt)) / 400, 0, 1);
         coop_ui_panel(_bx, _by, _bx + _tw, _by + 15);
         draw_set_alpha(_a); draw_set_color(c_yellow); draw_text(_bx + 5, _by + 1, _txt);

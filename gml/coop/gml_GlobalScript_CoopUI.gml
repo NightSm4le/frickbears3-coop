@@ -96,27 +96,14 @@ function coop_draw_scene_participants()
     {
         _partnerSpr = coop_art_get(_other, global.CoopCfg.partnerMask, "portrait");
     }
-    var _sz = 48;
-    var _y = 24;
-    var _boxW = 58;
-    var _boxH = 70;
-    draw_set_alpha(0.78);
-    draw_set_color(c_black);
-    draw_rectangle(3, _y - 2, 3 + _boxW, _y + _boxH, false);
-    draw_rectangle(_gw - 3 - _boxW, _y - 2, _gw - 3, _y + _boxH, false);
-    draw_set_alpha(1);
-    draw_set_color(c_white);
-    draw_set_halign(fa_center);
-    draw_text(3 + (_boxW / 2), _y - 1, "PLAYER " + string(_me));
-    draw_text(_gw - 3 - (_boxW / 2), _y - 1, "PLAYER " + string(_other));
-    if (_ownSpr >= 0)
-    {
-        draw_sprite_ext(_ownSpr, 0, 8, _y + 14, _sz / sprite_get_width(_ownSpr), _sz / sprite_get_height(_ownSpr), 0, c_white, 1);
-    }
-    if (_partnerSpr >= 0)
-    {
-        draw_sprite_ext(_partnerSpr, 0, _gw - 8 - _sz, _y + 14, _sz / sprite_get_width(_partnerSpr), _sz / sprite_get_height(_partnerSpr), 0, c_white, 1);
-    }
+    // 0.7.5: one compact panel bottom-right (was two big boxes in both top corners over native titles / money)
+    if (instance_exists(oTitleMenu) || room == TitleScreenMap || room == Extras || room == CustomNightMenu || coop_is_maze_room(room)) { exit; }
+    var _gh = display_get_gui_height(), _sz = 24, _x2 = _gw - 4, _x1 = _x2 - 2 * _sz - 10, _y1 = _gh - _sz - 30;
+    coop_ui_panel(_x1, _y1, _x2, _y1 + _sz + 14);
+    if (_ownSpr >= 0) { draw_sprite_ext(_ownSpr, 0, _x1 + 3, _y1 + 12, _sz / sprite_get_width(_ownSpr), _sz / sprite_get_height(_ownSpr), 0, c_white, 1); }
+    if (_partnerSpr >= 0) { draw_sprite_ext(_partnerSpr, 0, _x1 + 7 + _sz, _y1 + 12, _sz / sprite_get_width(_partnerSpr), _sz / sprite_get_height(_partnerSpr), 0, c_white, 1); }
+    draw_set_color(make_color_rgb(200, 196, 188)); draw_set_halign(fa_center);
+    draw_text(_x1 + 3 + _sz / 2, _y1, "P" + string(_me)); draw_text(_x1 + 7 + _sz * 1.5, _y1, "P" + string(_other));
     draw_set_halign(fa_left);
     draw_set_color(c_white);
 }
@@ -232,7 +219,7 @@ function coop_draw_overlay()
     if (_strip) { _w = 304; _h = 25; _px = 244; _py = 3; }
     else switch (_u.corner)
     {
-        case 0: _px = _gw - _w - 4; _py = 22; break;             // top-right, under Tokens
+        case 0: _px = _gw - _w - 4; _py = 26; break;             // top-right, under Tokens
         case 1: _px = 4; _py = 44; break;                        // top-left, under the clock
         case 2: _px = 4; _py = _gh - _h - 48; break;             // bottom-left, above power
         default: _px = _gw - _w - 4; _py = _gh - _h - 48; break; // bottom-right
@@ -305,8 +292,8 @@ function coop_draw_overlay()
     {
         var _ht = "CO-OP: P ping G power L lure M mark V revive Tab hide F9 move";
         var _hw = string_width(_ht) + 10;
-        coop_ui_panel(_gw / 2 - _hw / 2, _gh - 64, _gw / 2 + _hw / 2, _gh - 50);
-        draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh - 63, _ht); draw_set_halign(fa_left); draw_set_alpha(1);
+        coop_ui_panel(_gw / 2 - _hw / 2, 66, _gw / 2 + _hw / 2, 80); // 0.7.5: top band (bottom is Phone Guy subtitles / Power / Mute Call)
+        draw_set_alpha(0.9); draw_set_color(c_ltgray); draw_set_halign(fa_center); draw_text(_gw / 2, 67, _ht); draw_set_halign(fa_left); draw_set_alpha(1);
     }
     coop_draw_alerts();
 }
