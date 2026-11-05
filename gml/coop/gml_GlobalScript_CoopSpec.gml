@@ -158,9 +158,11 @@ function coop_spec_step()
 {
     var _s = global.CoopS, _c = global.Coop;
     // bot: die on purpose at a given timer (picks an active animatronic as the killer)
-    if (_s.botDie >= 0 && !_s.botDieDone && room == Office && variable_global_exists("Timer") && global.Timer >= _s.botDie && coop_alive())
+    if (_s.botDie >= 0 && !_s.botDieDone && room == Office && variable_global_exists("Timer") && coop_bot_clock() >= _s.botDie && coop_alive())
     {
-        var _k = -1; for (var n = 0; n < array_length(global.CoopA.ids); n++) { var _q = global.CoopA.ids[n]; if (coop_anim_inst(_q) != noone && !coop_partner_holds(_q)) { _k = _q; break; } }
+        // 0.8.1: boss night (Timer stays 0, no shared animatronics) -> Salvage kills me through his own jumpscare
+        if (instance_exists(oSalvage) && variable_global_exists("Night") && boss_fight_night()) { _s.botDieDone = true; coop_log("bot: dying on purpose at clock " + string_format(coop_bot_clock(), 1, 1) + " killer Salvage"); with (oSalvage) { salvage_jumpscare(0); } }
+        var _k = -1; if (!_s.botDieDone) for (var n = 0; n < array_length(global.CoopA.ids); n++) { var _q = global.CoopA.ids[n]; if (coop_anim_inst(_q) != noone && !coop_partner_holds(_q)) { _k = _q; break; } }
         if (_k >= 0)
         {
             _s.botDieDone = true;

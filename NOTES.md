@@ -181,3 +181,8 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
   Not synced: shop (RunEarnings/Upgrades/CCStory_*), maze-run state, maze/menu textbox paging. Only numeric nights.
 - 215-boss: gml_GlobalScript_CoopBoss — Salvage roles: P1 distract (pushback x1.6, dmg x0.6, slows P2's Salvage while flashing), P2 hit (dmg x1.3 / x1.7 in the window). SOLO when the partner is down; host death now enrages too. Snapshot field bf.
 - proto 8.
+
+## 0.8.1
+- S13-1: roles SOLO only on confirmed death (partner snapshot sp=1 / alive=0) or >4 s away from Office (awayAt); reset on every Office entry.
+- S13-2: boss nights keep global.Timer = (Phase-1)*60 -> bot flags use coop_bot_clock() (seconds since Office entry on boss nights). Dead bot sets snapshot brq=1 (optional field, proto stays 8); bot survivor holds V.
+  Revive re-entry (CoopF.revivedEnter) keeps revLeft/aggro, host restores HP = hpKeep - deadDmg (bdmg received while dead), enrage re-applied to the new Salvage (coop_boss_restore_step).

@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 8,
-    modver: "0.8.0",
+    modver: "0.8.1",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -566,6 +566,7 @@ function coop_alive()
 function coop_snapshot()
 {
     var _s = { t: "snap", rm: room_get_name(room), alive: coop_alive(), sp: global.CoopS.spec ? 1 : 0, sc: coop_score_arr() };
+    if (global.CoopS.spec && global.Coop.bot && global.CoopF.botRevive >= 0 && coop_bot_clock() >= global.CoopF.botRevive) { _s.brq = 1; } // 0.8.1: dead bot asks a bot survivor to revive (optional field)
     if (variable_global_exists("Guard") && is_numeric(global.Guard)) { _s.gn = guard_name(global.Guard); }
     if (variable_global_exists("TimeOfDeath") && is_numeric(global.TimeOfDeath)) { _s.tod = global.TimeOfDeath; }
     if (room == Office)

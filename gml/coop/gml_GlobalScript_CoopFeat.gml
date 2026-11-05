@@ -7,7 +7,7 @@ global.CoopF = {
     // marks
     marks: [], markCd: 0, botMark: -1, botMarkDone: false, markShotAt: 0,
     // revive
-    revLeft: 1, revHold: 0, revPend: undefined, invulUntil: 0, botRevive: -1, revShotAt: 0, revHoldShot: false,
+    revLeft: 1, revHold: 0, revPend: undefined, revivedEnter: false, invulUntil: 0, botRevive: -1, revShotAt: 0, revHoldShot: false,
     // joint door event
     jd: { state: "idle", side: 0, t0: 0, t1: 0, okMe: -1, okP: -1, resAt: 0, done: false, sent: false, outAt: 0, outOk: -1 },
     botJd: -1, botJdClose: 1, jdShotWarn: false, jdShotWin: false,
@@ -339,7 +339,12 @@ function coop_revive_step()
         _f.revHold = 0; return;
     }
     var _hold = keyboard_check(ord("V")) && coop_help_key_free(ord("V"));
-    if (_f.botRevive >= 0 && _c.bot && global.Timer >= _f.botRevive) { _hold = true; }
+    // 0.8.1 (S13-2): boss nights keep global.Timer at 0 (it is the boss phase clock), so the bot uses coop_bot_clock();
+    // the DEAD side's -coop-botrevive also works: its snapshot asks (brq=1) and a bot survivor starts holding V
+    var _botWhy = "";
+    if (_f.botRevive >= 0 && _c.bot && coop_bot_clock() >= _f.botRevive) { _hold = true; _botWhy = "-coop-botrevive " + string(_f.botRevive); }
+    else if (_c.bot && coop_partner_get("brq", 0) == 1) { _hold = true; _botWhy = "partner asked (its -coop-botrevive)"; }
+    if (_botWhy != "" && _f.revHold <= 0) { coop_log("bot: revive hold starts (" + _botWhy + ", clock " + string_format(coop_bot_clock(), 1, 1) + ")"); }
     if (!_hold) { _f.revHold = 0; return; }
     _f.revHold += delta_time / 1000;
     // the reviver's office is vulnerable while holding: doors forced open, no cams/mask
@@ -406,6 +411,7 @@ function coop_feat_office_enter()
     _f.jd.state = "idle";
     if (_f.revPend == undefined) { return; }
     var _p = _f.revPend; _f.revPend = undefined;
+    _f.revivedEnter = true; // 0.8.1 (S13-2): coop_more_step keeps the boss state / revive counter for this re-entry
     var _tm = coop_is_host() ? coop_partner_get("tm", -1) : global.Coop.hostTimer;
     if (is_numeric(_tm) && _tm > 0) { global.Timer = _tm; }
     global.Power = min(_p.pw, global.Power);

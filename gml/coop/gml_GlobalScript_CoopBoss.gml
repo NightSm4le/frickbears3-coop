@@ -6,12 +6,50 @@
 //   P2 = HIT:      my flashlight does 130% damage; 170% while P1 is distracting (partner's flash on Salvage).
 //   SOLO: the partner is dead / spectating / not in the office -> role bonuses off (100%), and the boss is enraged
 //        once per death (coop_boss_aggro, also when the HOST dies now). A revive restores the roles.
-global.CoopBR = { dmgAdj: 0, logAt: 0, win: false, winSeen: false, solo: false, winN: 0 };
+global.CoopBR = { dmgAdj: 0, logAt: 0, win: false, winSeen: false, solo: false, winN: 0, awayAt: 0 };
+
+// 0.8.1: a clock for the test bots. Boss nights keep global.Timer at (Phase-1)*60 (0 in phase 1), so -coop-botdie /
+// -coop-botrevive N there mean "N seconds after I entered the Office"; other nights use global.Timer as before.
+function coop_bot_clock()
+{
+    var _s = (current_time - global.CoopMore.officeAt) / 1000;
+    if (variable_global_exists("Night") && boss_fight_night()) { return _s; }
+    var _t = variable_global_exists("Timer") ? global.Timer : 0;
+    return (_t > 0) ? _t : _s;
+}
+
+// 0.8.1 (S13-1): every Office entry starts with roles ON; SOLO only after a confirmed death or a long absence
+function coop_boss_roles_enter() { global.CoopBR.solo = false; global.CoopBR.awayAt = 0; }
+
+// 0.8.1 (S13-2): first step back in the Office after a revive (the room restarted, Salvage is a new instance)
+function coop_boss_revive_enter()
+{
+    var _B = global.CoopB;
+    _B.pDeadSeen = false; _B.meDeadSeen = false; _B.lastHP = -1;
+    _B.reAggro = _B.aggro; // re-apply the enrage to the new Salvage
+    if (coop_is_host() && _B.hpKeep >= 0) { _B.restoreHP = max(0.01, _B.hpKeep - _B.deadDmg); } // client: next bhp brings the HP
+    coop_log("BOSS: revived -> keep enrage " + string(_B.aggro) + (coop_is_host() ? ", HP back to " + string_format(_B.restoreHP, 1, 2) + " (partner hit " + string_format(_B.deadDmg, 1, 2) + " while I was down)" : ", HP from host") + ", revives left " + string(global.CoopF.revLeft));
+    _B.deadDmg = 0;
+}
+function coop_boss_restore_step()
+{
+    var _B = global.CoopB;
+    if (!instance_exists(oSalvage) || (_B.restoreHP < 0 && _B.reAggro <= 0)) { return; }
+    if (_B.restoreHP >= 0) { var _h = _B.restoreHP; with (oSalvage) { HP = min(_h, MaxHP); phase_transition(); } _B.restoreHP = -1; }
+    var _n = _B.reAggro; _B.reAggro = 0;
+    repeat (_n) { with (oSalvage) { MoveSpeed *= 1.25; SummonSpeed *= 1.25; HPDrainRate *= 0.9; } }
+    if (instance_exists(oSalvage)) { coop_log("BOSS: new Salvage after revive: HP " + string_format(oSalvage.HP, 1, 2) + " phase " + string(oSalvage.Phase) + ", enrage x" + string(_n) + " re-applied"); }
+}
 
 function coop_boss_role_me() { return (coop_my_slot() == 1) ? "distract" : "hit"; }
 function coop_boss_partner_up()
 {
     return current_time - global.Coop.partnerSnapAt < 2500 && coop_partner_get("rm", "") == "Office" && coop_partner_get("sp", 0) != 1 && coop_partner_get("alive", true);
+}
+// 0.8.1 (S13-1): confirmed down = the partner's own fresh snapshot says dead / spectating
+function coop_boss_partner_dead()
+{
+    return current_time - global.Coop.partnerSnapAt < 2500 && (coop_partner_get("sp", 0) == 1 || !coop_partner_get("alive", true));
 }
 // am I flashing Salvage right now (same test as oSalvage Step)
 function coop_boss_flashing()
@@ -35,7 +73,13 @@ function coop_boss_roles_step()
     }
     if (!coop_boss_roles_active()) { _R.win = false; return; }
     var _up = coop_boss_partner_up();
-    if (!_up != _R.solo) { _R.solo = !_up; coop_log("BOSS ROLES: " + (_R.solo ? "SOLO (partner down) - role bonuses off" : "partner back - role " + coop_boss_role_me())); }
+    // 0.8.1 (S13-1): the partner still loading the Office (NightOpening / opener / stale snapshot) is not "down".
+    // SOLO = confirmed death/spectate (at once) or away from the Office for more than 4 s.
+    var _soloNow;
+    if (_up) { _R.awayAt = 0; _soloNow = false; }
+    else if (coop_boss_partner_dead()) { _soloNow = true; }
+    else { if (_R.awayAt == 0) { _R.awayAt = current_time; } _soloNow = current_time - _R.awayAt > 4000; }
+    if (_soloNow != _R.solo) { _R.solo = _soloNow; coop_log("BOSS ROLES: " + (_R.solo ? "SOLO (partner down) - role bonuses off" : "partner back - role " + coop_boss_role_me())); }
     var _role = coop_boss_role_me();
     var _pfl = _up && coop_partner_get("bf", 0) == 1; // partner flashes HIS Salvage
     _R.win = (_role == "hit" && _pfl);

@@ -100,6 +100,11 @@ if (stage == "full")
     var boss = D("gml_GlobalScript_CoopBoss");
     need(boss.Contains("function coop_boss_roles_step(") && boss.Contains("MoveTimer") && boss.Contains("HPDrainRate") && boss.Contains("function coop_boss_roles_draw("), "215-boss role mechanics missing");
     need(more.Contains("coop_boss_roles_step()") && net.Contains("_s.bf = coop_boss_flashing()"), "215-boss roles not wired");
+    // 0.8.1 (S13-1 / S13-2)
+    need(boss.Contains("function coop_boss_partner_dead(") && boss.Contains("awayAt"), "S13-1 SOLO grace missing");
+    need(boss.Contains("function coop_bot_clock(") && boss.Contains("function coop_boss_revive_enter(") && boss.Contains("function coop_boss_restore_step("), "S13-2 revive boss restore missing");
+    need(more.Contains("coop_boss_revive_enter()") && more.Contains("coop_boss_restore_step()") && more.Contains("deadDmg"), "S13-2 revive re-entry not wired");
+    need(D("gml_GlobalScript_CoopFeat").Contains("coop_bot_clock()") && D("gml_GlobalScript_CoopFeat").Contains("brq") && net.Contains("brq"), "S13-2 bot revive clock / request missing");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");

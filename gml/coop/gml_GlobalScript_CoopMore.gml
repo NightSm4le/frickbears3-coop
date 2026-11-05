@@ -26,7 +26,7 @@ function coop_mask_fix()
 function coop_mask_name(_i) { var _n = ["freddy", "bonnie", "chica"]; return _n[clamp(_i, 0, 2)]; }
 
 global.CoopArt = { tried: false, spr: {} };
-global.CoopB = { lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, dmgIn: 0, aggro: 0, pDeadSeen: false, meDeadSeen: false,
+global.CoopB = { hpKeep: -1, deadDmg: 0, restoreHP: -1, reAggro: 0, lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, dmgIn: 0, aggro: 0, pDeadSeen: false, meDeadSeen: false,
     botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapIn: 0, scrapOut: 0, logAt: 0 };
 global.CoopM = { sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
     caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
@@ -273,6 +273,7 @@ function coop_more_packet(_t, _m)
             if (instance_exists(oTitleMenu)) { with (oTitleMenu) { if (CurMenu == "Co-op Settings") { CurrentOptions = coop_set_options(); CurrentDesc = coop_set_desc(); } } }
             return true;
         case "bdmg": // host: partner damaged the boss
+            if (coop_is_host() && !instance_exists(oSalvage) && global.CoopS.spec) { _B.deadDmg += _m.d; return true; } // 0.8.1: I am dead, kept for my revive
             if (coop_is_host() && instance_exists(oSalvage))
             {
                 _B.dmgIn += _m.d;
@@ -348,9 +349,11 @@ function coop_boss_step()
     var _B = global.CoopB, _c = global.Coop;
     if (!_c.connected || room != Office || !global.CoopCfg.bossShared) { _B.lastHP = -1; return; }
     coop_boss_roles_step(); // 0.8.0 (215-boss): roles change damage / pushback (before the HP delta below)
+    coop_boss_restore_step(); // 0.8.1 (S13-2): after a revive, once the new Salvage exists
     if (instance_exists(oSalvage))
     {
         var _hp = oSalvage.HP;
+        if (coop_is_host()) { _B.hpKeep = _hp; }
         if (coop_is_client())
         {
             if (_B.lastHP >= 0 && _hp < _B.lastHP - 0.00001) { var _d = _B.lastHP - _hp; _B.dmgOut += _d; coop_send({ t: "bdmg", d: _d }); }
@@ -723,10 +726,22 @@ function coop_more_step()
         if (room == Office)
         {
             _X.officeAt = current_time;
-            global.CoopF.revLeft = _g.revives;
-            if (!_g.jd) { global.CoopF.jd.done = true; }
             global.CoopA.repelChance = _g.repel;
-            _B.aggro = 0; _B.pDeadSeen = false; _B.meDeadSeen = false; global.CoopBR.dmgAdj = 0; global.CoopBR.solo = false; global.CoopBR.winN = 0; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
+            coop_boss_roles_enter(); // 0.8.1 (S13-1): SOLO grace on every Office entry
+            if (global.CoopF.revivedEnter)
+            {
+                // 0.8.1 (S13-2): back from a revive -> same night, same boss: keep the revive counter and the enrage level,
+                // take the shared boss HP back (host: own last HP minus what the partner hit while I was dead)
+                global.CoopF.revivedEnter = false;
+                coop_boss_revive_enter();
+            }
+            else
+            {
+                global.CoopF.revLeft = _g.revives;
+                if (!_g.jd) { global.CoopF.jd.done = true; }
+                _B.aggro = 0; _B.pDeadSeen = false; _B.meDeadSeen = false; global.CoopBR.dmgAdj = 0; global.CoopBR.solo = false; global.CoopBR.winN = 0; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
+                _B.hpKeep = -1; _B.deadDmg = 0; _B.restoreHP = -1; _B.reAggro = 0;
+            }
             _E.partnerEr = -1; _E.botBuyDone = false;
         }
         if (coop_is_maze_room(room)) { _M.mzRoom = room; _M.mzAt = current_time; _M.botSitOn = false; _M.botSitWait = false; _M.sitLog = -1; _M.sit = false; _M.psit = 0; _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
