@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 7,
-    modver: "0.7.6",
+    modver: "0.7.7",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -310,6 +310,7 @@ function coop_disconnect(_why)
     _c.connected = false;
     _c.mode = "off";
     _c.rtt = -1;
+    global.CoopCfg.hostDiff = -1; // 0.7.7 (S9-2)
     _c.status = "offline (" + _why + ")";
 }
 
@@ -362,7 +363,7 @@ function coop_apply_night(_m)
     var _c = global.Coop;
     global.Night = variable_struct_get(_m, "night");
     coop_prepare_night();
-    if (variable_struct_exists(_m, "difficulty")) { global.Difficulty = _m.difficulty; }
+    if (variable_struct_exists(_m, "difficulty")) { global.Difficulty = _m.difficulty; if (coop_is_client()) { global.CoopCfg.hostDiff = _m.difficulty; } }
     if (variable_struct_exists(_m, "ai")) { global.AILevels = _m.ai; }
     if (variable_struct_exists(_m, "speedup")) { global.NightSpeedup = _m.speedup; }
     if (variable_struct_exists(_m, "shuffle")) { global.ShuffleMode = _m.shuffle; }

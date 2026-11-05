@@ -11,8 +11,10 @@ EnsureDataLoaded();
 string modDir = Environment.GetEnvironmentVariable("COOP_MOD_DIR");
 string stage = Environment.GetEnvironmentVariable("COOP_STAGE") ?? "full";
 bool adminCheats = Environment.GetEnvironmentVariable("COOP_CHEATS") == "1";
+// 0.7.7 (S9-6): COOP_UNLOCKALL=1 when building the Unlock_All_Install data.win -> co-op saves default to _coop_unlockall
+bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
 if (modDir == null) throw new Exception("COOP_MOD_DIR not set");
-Console.WriteLine($"[apply] stage={stage} adminCheats={adminCheats} game={Data.GeneralInfo.DisplayName.Content}");
+Console.WriteLine($"[apply] stage={stage} adminCheats={adminCheats} unlockBuild={unlockBuild} game={Data.GeneralInfo.DisplayName.Content}");
 if (stage == "noop") { Console.WriteLine("[apply] noop: resave only"); return; }
 
 var dirs = new System.Collections.Generic.List<string> { Path.Combine(modDir, "gml", "boot") };
@@ -141,6 +143,19 @@ if (stage == "full" || overlay)
 {
     // 0.7.3: maze salvage -> partner gets it silently
     g.QueueFindReplace("gml_GlobalScript_TextboxScripts", "array_push(global.SalvagesCurrent, other.SalvageID);", "array_push(global.SalvagesCurrent, other.SalvageID);\n                coop_salv_out(other.SalvageID);");
+}
+if (stage == "full" || overlay)
+{
+    // 0.7.7 (S9-1): Co-op Settings rows scrolled up into the header (CurrentDesc) are not drawn
+    g.QueueFindReplace("gml_Object_oTitleMenu_Draw_77",
+        "        draw_text((624 - XOffset[i]) + SetXOffset, (16 + (40 * i)) - YOffset, CurrentOptions[i]);",
+        "        if (coop_set_row_visible((16 + (40 * i)) - YOffset, i)) { draw_text((624 - XOffset[i]) + SetXOffset, (16 + (40 * i)) - YOffset, CurrentOptions[i]); }");
+}
+if ((stage == "full" || overlay) && unlockBuild)
+{
+    // 0.7.7 (S9-6): the Unlock All build behaves like -coop-unlockall without the flag; -coop-savetag X still overrides the tag
+    g.QueueFindReplace("gml_Object_oCoopNet_Create_0", "coop_parse_args();",
+        "global.CoopF.unlockBuild = true;\nglobal.CoopF.unlockAll = true;\nif (global.CoopF.saveTagArg == \"\") { global.CoopF.saveTagArg = \"_unlockall\"; }\ncoop_parse_args();");
 }
 var res = g.Import();
 Console.WriteLine("[apply] import done");

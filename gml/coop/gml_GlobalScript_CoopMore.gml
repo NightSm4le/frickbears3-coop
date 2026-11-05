@@ -12,7 +12,8 @@ global.CoopCfg = {
     partnerMask: 1,
     partnerMaskRaw: -1,
     cchar: "", partnerChar: "",  // 0.7.4: custom character id (Addons/CoopChars/<id>/), "" = default mask art   // 0.6.2: mask the partner chose (partnerMask = what we draw; P2 never looks like P1)
-    loaded: false, fromHost: false
+    loaded: false, fromHost: false,
+    hostDiff: -1          // 0.7.7 (S9-2): host's shared difficulty as last received by the client (-1 = not synced yet)
 };
 // 0.6.2: P1 keeps its mask; if P2 picked the same one, P2 is shown with the next mask (freddy->bonnie->chica)
 function coop_mask_shown(_slot, _own, _other) { return (_slot == 2 && _own == _other) ? ((_own + 1) mod 3) : _own; }
@@ -29,7 +30,7 @@ global.CoopB = { lastHP: -1, hostHP: -1, hostPhase: 0, lastSend: 0, dmgOut: 0, d
     botBoss: -1, botBossDmg: -1, botBossNext: 0, botBossDone: false, botScrap: -1, botScrapDone: false, scrapDone: false, scrapTitles: [], scrapSent: false, scrapIn: 0, scrapOut: 0, logAt: 0 };
 global.CoopM = { sync: false, px: 0, py: 0, pdir: 0, pmove: 0, pAlive: true, meCaught: false, peer: noone, lastSend: 0, lastEnemySend: 0, enemies: undefined, enemiesAt: 0,
     caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
-    logAt: 0, followed: false, shotAt: 0, targetLog: "", sit: false, psit: 0, botSit: -1, botSitDone: false, botSitUntil: 0, sitShot: false, sitLog: -1 };
+    logAt: 0, followed: false, shotAt: 0, targetLog: "", sit: false, psit: 0, botSit: -1, botSitDone: false, botSitUntil: 0, botSitOn: false, mzRoom: -1, mzAt: 0, sitShot: false, sitLog: -1 };
 global.CoopE = { pMoney: -1, pBuys: [], buysIn: 0, buysOut: 0, partnerEr: -1, botBuy: -1, botBuyDone: false, shown: 0 };
 global.CoopMore = { pwAt: 0, botAdv: -1, botAdvAt: 0, roomAt: 0, officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
 
@@ -128,10 +129,11 @@ function coop_set_options()
 function coop_set_desc()
 {
     var _g = global.CoopCfg;
-    var _s = "Co-op settings. Host decides for both;\nyour mask and developer mode are local.";
-    if (_g.devMode) { _s += "\nDeveloper mode shows spectator stream diagnostics."; }
-    if (coop_is_client()) { _s += "\nConnected: values come from the host."; }
-    if (variable_global_exists("Difficulty")) { _s += "\nDifficulty (shared, host save): " + string(global.Difficulty); }
+    // 0.7.7 (S9-1): at most 3 header lines, so the rows above the cursor have room below it
+    var _s = "Co-op settings. Host decides for both;\n" + (_g.devMode ? "mask, dev mode (stream stats ON): local." : "your mask and developer mode are local.");
+    // 0.7.7 (S9-2): the client shows the host's synced value, not its own save's (the title screen reloads the client save)
+    if (coop_is_client()) { _s += "\nFrom host. Difficulty (shared): " + ((_g.hostDiff >= 0) ? string(_g.hostDiff) : "waiting..."); }
+    else if (variable_global_exists("Difficulty")) { _s += "\nDifficulty (shared, host save): " + string(global.Difficulty); }
     return _s;
 }
 
@@ -158,6 +160,15 @@ function coop_set_select()
 }
 
 function coop_set_back() { goto_menu("Co-op", 4); }
+
+// 0.7.7 (S9-1), oTitleMenu Draw_77 scope: in Co-op Settings, an option row scrolled up into the header text
+// (CurrentDesc, drawn from y=16) is not drawn. The selected row (resting at y=168) always stays visible.
+function coop_set_row_visible(_y, _i)
+{
+    if (CurMenu != "Co-op Settings" || _i == SelectedOption) { return true; }
+    var _top = min(16 + string_height_ext(CurrentDesc, 32, 612) + 6, 160);
+    return _y >= _top;
+}
 
 // ---------------- runtime art (drafts) ----------------
 function coop_art_get(_slot, _mask, _kind)
@@ -255,6 +266,7 @@ function coop_more_packet(_t, _m)
             if (coop_is_client())
             {
                 _g.repel = _m.repel; _g.revives = _m.revives; _g.jd = _m.jd; _g.bossShared = _m.bossShared; _g.maze = _m.maze; _g.specReward = _m.specReward; _g.fromHost = true;
+                if (_m.diff >= 0) { _g.hostDiff = _m.diff; }
                 if (_m.diff >= 0 && variable_global_exists("Difficulty") && global.Difficulty != _m.diff) { coop_log("ECON: difficulty " + string(global.Difficulty) + " -> host " + string(_m.diff) + " (one difficulty for both)"); global.Difficulty = _m.diff; }
             }
             coop_cfg_apply("from partner");
@@ -714,7 +726,7 @@ function coop_more_step()
             _B.aggro = 0; _B.pDeadSeen = false; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
             _E.partnerEr = -1; _E.botBuyDone = false;
         }
-        if (coop_is_maze_room(room)) { _M.sit = false; _M.psit = 0; _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
+        if (coop_is_maze_room(room)) { _M.mzRoom = room; _M.mzAt = current_time; _M.botSitOn = false; _M.sit = false; _M.psit = 0; _M.meCaught = false; _M.pAlive = true; _M.botApproachDone = false; _M.botFaceDone = false; _M.botExitDone = false; _M.targetLog = ""; coop_log("MAZE: entered " + room_get_name(room) + (_c.connected ? " (co-op)" : "")); }
         _X.prevRoom = room;
     }
     // money in the snapshot-free channel: send on change
@@ -889,13 +901,16 @@ function coop_maze_crouch(_held)
     if (!instance_exists(oTextBox) && (keyboard_check_pressed(ord("C")) || keyboard_check_pressed(vk_control)))
     {
         _M.sit = !_M.sit;
+        _M.botSitOn = false; // 0.7.7 (S9-3): a manual C/Ctrl takes over; the bot timer never cancels it
         coop_log("MAZE: I " + (_M.sit ? "sat down" : "stood up") + " (C/Ctrl)");
     }
-    if (_M.botSit >= 0 && instance_exists(oCamera3DMaze))
+    // 0.7.7 (S9-3): the bot sit only starts once the maze room was entered (oCoopNet saw it) and has been up for 1 s,
+    // the delay counts from that entry, and only the bot's own sit is ended by the bot.
+    if (_M.botSit >= 0 && instance_exists(oCamera3DMaze) && coop_is_maze_room(room) && _M.mzRoom == room && current_time - _M.mzAt >= 1000)
     {
-        var _sec = (current_time - global.CoopS3.mzIn) / 1000;
-        if (!_M.botSitDone && _sec >= _M.botSit) { _M.botSitDone = true; _M.sit = true; _M.botSitUntil = current_time + 15000; coop_log("bot: FORCED sit for 15 s (-coop-botsit)"); }
-        if (_M.botSitDone && _M.sit && current_time > _M.botSitUntil) { _M.sit = false; coop_log("bot: stand up"); }
+        var _sec = (current_time - _M.mzAt) / 1000;
+        if (!_M.botSitDone && _sec >= max(1, _M.botSit)) { _M.botSitDone = true; _M.botSitOn = true; _M.sit = true; _M.botSitUntil = current_time + 15000; coop_log("bot: FORCED sit for 15 s (-coop-botsit)"); }
+        else if (_M.botSitOn && current_time > _M.botSitUntil) { _M.botSitOn = false; _M.sit = false; coop_log("bot: stand up"); }
         if (_M.botSitDone && !_M.sitShot && current_time > _M.botSitUntil - 7000) { _M.sitShot = true; global.CoopMore.shotReq = "maze_sit"; global.CoopMore.shotAt = current_time; }
     }
     return _held || _M.sit;
@@ -935,8 +950,9 @@ function coop_salv_draw()
     if (_S.icon < 0 || current_time - _S.iconAt > 6000 || !coop_is_maze_room(room)) { return; }
     var _gw = display_get_gui_width(), _t = "PARTNER SALVAGED  " + string(array_length(global.SalvagesCurrent)) + "/" + string(global.SalvageQuota);
     var _w = string_width(_t) + 12;
-    coop_ui_panel(_gw - _w - 4, 44, _gw - 4, 60); // 0.7.5: below the native money box
-    draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(make_color_rgb(244, 240, 232)); draw_text(_gw - _w + 2, 27, _t); draw_set_color(c_white);
+    var _py = 44; // 0.7.5: below the native money box; 0.7.7 (S9-5): text follows the box (was still at y=27, over the money box)
+    coop_ui_panel(_gw - _w - 4, _py, _gw - 4, _py + 16);
+    draw_set_halign(fa_left); draw_set_valign(fa_top); draw_set_color(make_color_rgb(244, 240, 232)); draw_text(_gw - _w + 2, _py + 2, _t); draw_set_color(c_white);
 }
 
 // ---------------- 0.7.4: custom characters ----------------

@@ -84,6 +84,12 @@ if (stage == "full")
         var pz = D(n);
         need(pz.Contains("coop_pause_requested(") && pz.Contains("coop_pause_on_close()"), n + " pause sync hooks missing");
     }
+    // 0.7.7
+    need(D("gml_Object_oTitleMenu_Draw_77").Contains("coop_set_row_visible("), "S9-1 Co-op Settings header clip hook missing");
+    need(more.Contains("function coop_set_row_visible(") && more.Contains("hostDiff"), "S9-1/S9-2 settings helpers missing");
+    bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
+    var ncreate = D("gml_Object_oCoopNet_Create_0");
+    need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");
     if (adminCheats)
     {
         need(Data.Code.ByName("gml_GlobalScript_CoopAdmin") != null, "admin cheats script missing");

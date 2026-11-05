@@ -641,6 +641,6 @@ function coop_unlock_all()
     if (!_need) { return; }
     for (var i = 0; i < array_length(_ua); i++) { _ua[i] = true; }
     if (variable_global_exists("UnlockedTrophies") && is_array(global.UnlockedTrophies) && array_length(global.UnlockedTrophies) > 47) { global.UnlockedTrophies[47] = true; }
-    coop_log("UNLOCK: -coop-unlockall -> all animatronics + trophy 47 unlocked (co-op save " + global.CoopSaveTag + " only)");
+    coop_log("UNLOCK: " + ((variable_struct_exists(global.CoopF, "unlockBuild") && global.CoopF.unlockBuild) ? "Unlock All build" : "-coop-unlockall") + " -> all animatronics + trophy 47 unlocked (co-op save " + global.CoopSaveTag + " only)");
     if (instance_exists(oTitleMenu)) { with (oTitleMenu) { if (CurMenu == "Title" && !Transitioning) { goto_menu("Title", 0); } } }
 }

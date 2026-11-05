@@ -283,7 +283,9 @@ function coop_spec_draw()
     }
     else { draw_set_color(c_gray); draw_set_halign(fa_center); draw_text(_gw / 2, _gh / 2, "waiting for partner's camera..."); draw_set_halign(fa_left); }
     // partner HUD on top (from the state snapshot)
+    // 0.7.7 (S9-4): same h:mm AM/PM as the game's clock (oCamera_UIStuff), not the bare hour
     var _tm = coop_partner_get("tm", 0), _hr = floor(_tm / 60 + 12) mod 12; if (_hr == 0) { _hr = 12; }
+    var _mn = floor(_tm + 1440) mod 60, _clk = string(_hr) + ":" + ((_mn < 10) ? "0" : "") + string(_mn) + (((floor(_tm / 720) mod 2) == 0) ? " AM" : " PM");
     var _pw = coop_partner_get("pw", 0);
     var _view = coop_partner_get("cu", 0) ? ((coop_partner_get("ms", "Cameras") == "Shop") ? "SHOP" : "CAM " + string(coop_partner_get("cam", "?"))) : "OFFICE";
     if (coop_partner_get("mk", 0)) { _view = "MASK"; } if (coop_partner_get("pu", 0)) { _view = "PANEL"; }
@@ -296,7 +298,7 @@ function coop_spec_draw()
     coop_art_partner_portrait(_gw - 56, 28, 48, 1);
     draw_set_color(c_white); draw_text(_gw - 54, 72, "P" + string(coop_partner_slot()));
     draw_set_color(c_white);
-    draw_text(170, _by + 1, string(_hr) + " AM   power " + string(floor(max(_pw, 0))) + "%   doors " + (coop_partner_get("d0", 0) ? "L" : "-") + (coop_partner_get("d1", 0) ? "R" : "-") + "   " + _view);
+    draw_text(170, _by + 1, _clk + "   power " + string(floor(max(_pw, 0))) + "%   doors " + (coop_partner_get("d0", 0) ? "L" : "-") + (coop_partner_get("d1", 0) ? "R" : "-") + "   " + _view);
     draw_set_color(c_ltgray);
     var _age = current_time - _s.lastFrameAt;
     var _gr = coop_spec_give_button_rect(), _gkey = coop_spec_round_key();
@@ -307,16 +309,21 @@ function coop_spec_draw()
     draw_set_color(_gReady ? c_white : c_gray); draw_set_halign(fa_center);
     draw_text((_gr[0] + _gr[2]) / 2, _gr[1] + 3, _gUsed ? "POWER USED" : (_s.specGivePending ? "SENDING..." : (_gReady ? "G  +10% POWER" : "WAIT FOR PARTNER")));
     draw_set_halign(fa_left);
-    coop_ui_panel(0, _gh - 32, _gw, _gh);
+    // 0.7.7 (S9-4): the streamed frame carries the partner's own HUD (Power y~336+, Mute Call, Temperature), so the footer
+    // lives in the free band above it (y 302..330): hints left of the G button, stream stats right of it.
+    var _fy = _gh - 58, _fl1 = "P: ping   M: mark partner's camera", _fl2 = "Game Over only if both die | 6 AM wins";
+    coop_ui_panel(0, _fy, min(_gr[0] - 4, 8 + max(string_width(_fl1), string_width(_fl2))), _fy + 28);
     draw_set_color(c_ltgray);
-    draw_text(4, _gh - 29, "P: ping    M: mark partner's camera");
-    draw_set_halign(fa_right);
-    draw_text(_gw - 4, _gh - 13, string(_s.fw) + "x" + string(_s.fh) + " " + string_format(_s.rfps, 1, 1) + "fps" + ((_c.rtt >= 0) ? " " + string(_c.rtt) + "ms" : "") + ((_age > 2000 && _s.framesIn > 0) ? " (stalled)" : ""));
+    draw_text(4, _fy + 1, _fl1);
+    draw_text(4, _fy + 14, _fl2);
+    var _st = string(_s.fw) + "x" + string(_s.fh) + " " + string_format(_s.rfps, 1, 1) + "fps" + ((_c.rtt >= 0) ? " " + string(_c.rtt) + "ms" : "") + ((_age > 2000 && _s.framesIn > 0) ? " (stalled)" : "");
+    coop_ui_panel(max(_gr[2] + 4, _gw - 8 - string_width(_st)), _fy + 13, _gw, _fy + 28);
+    draw_set_color(c_ltgray); draw_set_halign(fa_right);
+    draw_text(_gw - 4, _fy + 14, _st);
     draw_set_halign(fa_left);
-    draw_text(4, _gh - 15, "Both players must die for Game Over | 6 AM wins");
     if (global.CoopCfg.devMode)
     {
-        var _dx = max(4, _gw - 274), _dy = 18, _rtt = (_c.rtt >= 0) ? string(_c.rtt) : "--";
+        var _dx = max(4, _gw - 274), _dy = 90, _rtt = (_c.rtt >= 0) ? string(_c.rtt) : "--";
         coop_ui_panel(_dx, _dy, _gw - 4, _dy + 76);
         draw_set_color(c_yellow); draw_text(_dx + 6, _dy + 3, "DEV STREAM  level " + string(max(_s.inLevel, 0)));
         draw_set_color(c_white);
@@ -325,7 +332,7 @@ function coop_spec_draw()
         draw_text(_dx + 6, _dy + 45, "Packet: " + string(_s.lastFrameSize) + " B  age: " + string(_age) + " ms");
         draw_text(_dx + 6, _dy + 59, "Frames received: " + string(_s.framesIn));
     }
-    if (current_time - _c.lastPingSent < 1500) { draw_set_color(c_yellow); draw_text(4, 16, "ping sent!"); }
+    if (current_time - _c.lastPingSent < 1500) { draw_set_color(c_yellow); draw_text(4, 44, "ping sent!"); }
     coop_draw_alerts();
 }
 

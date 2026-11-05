@@ -33,6 +33,9 @@ else if (_c.rjN > 0 && _c.rjLeft <= 0 && _c.mode == "off") { coop_log("RECONNECT
 if (room != _c.prevRoom)
 {
     coop_log("room " + room_get_name(room));
+    // 0.7.7 (S9-2): a room that reloads the client's own co-op save (title screen) must not bring back its old difficulty
+    if (coop_is_client() && _c.connected && global.CoopCfg.hostDiff >= 0 && variable_global_exists("Difficulty") && global.Difficulty != global.CoopCfg.hostDiff)
+    { coop_log("ECON: difficulty " + string(global.Difficulty) + " -> host " + string(global.CoopCfg.hostDiff) + " (re-applied after room load)"); global.Difficulty = global.CoopCfg.hostDiff; }
     if (_c.prevRoom == Office) { coop_anim_night_end(); }
     if (room == NightOpening) { coop_score_reset(); BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0 fix: stale 6AM flag from the previous night
     if (room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0: Endless rounds skip NightOpening
