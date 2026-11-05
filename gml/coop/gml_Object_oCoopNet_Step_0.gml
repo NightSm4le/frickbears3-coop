@@ -39,6 +39,7 @@ if (room != _c.prevRoom)
     if (_c.prevRoom == Office) { coop_anim_night_end(); }
     if (room == NightOpening) { coop_score_reset(); BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0 fix: stale 6AM flag from the previous night
     if (room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { BotWinDone = false; _c.partnerWon = false; _c.partnerWonNight = undefined; } // 0.6.0: Endless rounds skip NightOpening
+    if (room == Office && variable_global_exists("Night")) { coop_prepare_night(); } // 0.8.4 (CRASH-GO): Deaths shape fixed on every night start (Endless: number, else array)
     if (room == Office) { global.CoopMore.officeAt = current_time; coop_anim_night_start(); coop_feat_office_enter(); if (!global.CoopS.hintSeen) { global.CoopS.hintSeen = true; global.CoopS.hintUntil = current_time + 6000; } /* 0.8.3 (UX-S16-O1): key hint once per session, then on Tab */ if (!global.CoopF.revivedEnter) { global.CoopS.botDieDone = false; } global.CoopS.botHelpStep = 0; } // 0.8.2 (S14-1): officeAt before coop_spec_step; one botdie per night (not again after a revive)
     if (coop_is_host() && _c.connected && room == NightOpening) { coop_send(coop_night_payload()); }
     else if (coop_is_host() && _c.connected && room == Office && _c.prevRoom != NightOpening && variable_global_exists("Night") && global.Night == "Endless") { coop_send(coop_night_payload()); coop_log("ENDLESS: night payload sent on Office entry (round " + string(global.EndlessRound) + ")"); }

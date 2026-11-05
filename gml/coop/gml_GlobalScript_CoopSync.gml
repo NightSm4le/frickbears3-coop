@@ -257,10 +257,41 @@ function coop_tb_key(_i)
     return string(_i.TextPage) + "|" + string_copy(_t, 1, 48);
 }
 
+// 0.8.4 (CRASH-TB): oTextBox_Fredbear has its own Create (no CGPFunction, different extras) - every field read is checked
+function coop_tb_arr_at(_i, _name, _page, _def)
+{
+    if (!variable_instance_exists(_i, _name)) { return _def; }
+    var _a = variable_instance_get(_i, _name);
+    if (!is_array(_a) || _page < 0 || _page >= array_length(_a)) { return _def; }
+    return _a[_page];
+}
+
 function coop_tb_can(_i)
 {
-    with (_i) { return TextPage > 0 && !ExternalPause && Delay[TextPage] == 0 && !Lock[TextPage]; }
-    return false;
+    if (!instance_exists(_i)) { return false; }
+    if (!variable_instance_exists(_i, "TextPage") || !variable_instance_exists(_i, "TextPageNumber")) { return false; }
+    var _p = _i.TextPage;
+    if (!is_numeric(_p) || _p <= 0) { return false; }
+    if (variable_instance_exists(_i, "ExternalPause") && _i.ExternalPause) { return false; }
+    if (coop_tb_arr_at(_i, "Delay", _p, 0) != 0) { return false; }
+    if (coop_tb_arr_at(_i, "Lock", _p, false)) { return false; }
+    if (!variable_instance_exists(_i, "TextLength") || !is_array(_i.TextLength) || _p >= array_length(_i.TextLength)) { return false; }
+    return true;
+}
+
+// 0.8.4 (CRASH-TB): page callbacks, only if the textbox object really has them (plain oTextBox: Function + CGPFunction; Fredbear: Function only)
+function coop_tb_run_page_funcs()
+{
+    var _fn = coop_tb_arr_at(id, "Function", TextPage, undefined);
+    if (is_callable(_fn)) { _fn(); }
+    if (variable_instance_exists(id, "CGPFunction")) // no direct CGPFunction read anywhere
+    {
+        var _f = coop_tb_arr_at(id, "CGPFunction", TextPage, undefined);
+        if (is_array(_f))
+        {
+            if (array_length(_f) == 1) { _f[0](); } else if (array_length(_f) > 1) { _f[0](_f[1]); }
+        }
+    }
 }
 
 // one forward press on ONE textbox (same as oTextBox draw_everything with ForwardKey)
@@ -272,12 +303,7 @@ function coop_tb_forward_self()
     {
         if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; audio_play_sound(sfxCamSwitch, 5, false); initialize(); var _boundGameText = method(id, game_text); _boundGameText(_dst); }
         TextPage += 1; TextDrawChar = 0;
-        if (is_callable(Function[TextPage])) { Function[TextPage](); }
-        if (array_length(CGPFunction) > 0 && TextPage < array_length(CGPFunction))
-        {
-            var _f = CGPFunction[TextPage];
-            if (array_length(_f) == 1) { _f[0](); } else if (array_length(_f) > 1) { _f[0](_f[1]); }
-        }
+        coop_tb_run_page_funcs();
         Frame = 0;
         return "adv";
     }
@@ -289,7 +315,11 @@ function coop_tb_forward_inst(_i)
 {
     if (!instance_exists(_i)) { return ""; }
     var _forward = method(_i, coop_tb_forward_self);
-    return _forward();
+    // 0.8.4 (CRASH-TB): a packet must never kill the game from the Networking event - log and drop instead
+    var _r = "";
+    try { _r = _forward(); }
+    catch (_e) { coop_log("SYNC tb: forward failed on " + object_get_name(_i.object_index) + ": " + string(_e)); _r = "err"; }
+    return _r;
 }
 
 function coop_tb_list()

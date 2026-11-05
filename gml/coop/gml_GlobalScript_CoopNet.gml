@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 8,
-    modver: "0.8.3",
+    modver: "0.8.4",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -412,6 +412,7 @@ function coop_apply_night(_m)
         if (variable_struct_exists(_m, "round")) { global.EndlessRound = _m.round; }
         if (variable_struct_exists(_m, "guard")) { global.Guard = _m.guard; if (_fresh) { global.Lives = array_create(3, global.Guard); } }
         global.AILevels = array_create(201, 0);
+        coop_prepare_night(); // 0.8.4 (CRASH-GO): Endless keeps Deaths numeric
         coop_log("ENDLESS: round " + string(global.EndlessRound) + " guard " + string(global.Guard) + " salvages " + string(array_length(global.AllTimeSalvages)) + " from host");
     }
     coop_log("ECON: difficulty " + string(global.Difficulty) + " from host (one difficulty for both)");
@@ -697,8 +698,24 @@ function coop_draw_gui()
 
 // Starting a story night straight from the title (coop night start / bot) skips the game's New Game/Continue path;
 // at boot initialize_endless_data() leaves global.Deaths = 0 (a number), and count_jumpscare / NightClear then index it.
+// 0.8.4 (CRASH-GO): in Endless (Brave Tower) the game itself keeps global.Deaths a NUMBER (initialize_endless_data: 0,
+// oGameOver Create: global.Deaths += Repeats). Turning it into an array there made every Endless death crash with
+// "DoAdd :2: illegal array use" in oGameOver Create. Endless -> number (array collapsed back to its sum), else -> array.
 function coop_prepare_night()
 {
+    if (variable_global_exists("Night") && global.Night == "Endless")
+    {
+        if (!variable_global_exists("Deaths")) { global.Deaths = 0; }
+        else if (is_array(global.Deaths))
+        {
+            var _sum = 0;
+            for (var _d = 0; _d < array_length(global.Deaths); _d++) { if (is_numeric(global.Deaths[_d])) { _sum += global.Deaths[_d]; } }
+            global.Deaths = _sum;
+            coop_log("prepare night: Endless -> global.Deaths back to a number (" + string(_sum) + ")");
+        }
+        else if (!is_numeric(global.Deaths)) { global.Deaths = 0; }
+        return;
+    }
     var _guard = variable_global_exists("Guard") && is_numeric(global.Guard) ? clamp(floor(global.Guard), 0, 200) : 5;
     var _need = max(6, _guard + 1);
     var _hasDeaths = variable_global_exists("Deaths");

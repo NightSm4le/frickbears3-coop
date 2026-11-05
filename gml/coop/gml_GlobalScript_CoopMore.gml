@@ -620,18 +620,14 @@ function coop_bot_textbox_forward()
 {
     with (oTextBox)
     {
-        if (ExternalPause || Delay[TextPage] != 0 || Lock[TextPage]) { continue; }
+        // 0.8.4 (CRASH-TB): guarded field reads (same object list as coop_tb_list may include Fredbear-style boxes)
+        if (ExternalPause || coop_tb_arr_at(id, "Delay", TextPage, 0) != 0 || coop_tb_arr_at(id, "Lock", TextPage, false)) { continue; }
         if (TextDrawChar != TextLength[TextPage]) { TextDrawChar = TextLength[TextPage]; continue; }
         if (TextPage < (TextPageNumber - 1))
         {
             if (TextPage == (TextPageNumber - 2) && TextOptionNumber > 0) { var _dst = TextOptionLink[TextOptionPosition]; initialize(); game_text(_dst); }
             TextPage += 1; TextDrawChar = 0;
-            if (is_callable(Function[TextPage])) { Function[TextPage](); }
-            if (array_length(CGPFunction) > 0 && TextPage < array_length(CGPFunction))
-            {
-                var _f = CGPFunction[TextPage];
-                if (array_length(_f) == 1) { _f[0](); } else if (array_length(_f) > 1) { _f[0](_f[1]); }
-            }
+            coop_tb_run_page_funcs(); // 0.8.4 (CRASH-TB): no CGPFunction read on objects that lack it
             Frame = 0;
         }
         else { instance_destroy(); }
@@ -792,10 +788,13 @@ function coop_more_bot()
     if (_M.botMaze >= 0 && coop_is_host() && _c.connected && !_M.botMazeDone && room == TitleScreenMap && oCoopNet.BotTimer > 180)
     {
         _M.botMazeDone = true;
-        global.Night = _M.botMaze; coop_prepare_night();
+        // 0.8.4: "-coop-botmaze" without a night number (or out of range) -> night 1..5 clamp instead of index -1
+        var _mn = clamp(floor(_M.botMaze), 1, 5);
+        if (_mn != _M.botMaze) { coop_log("bot: -coop-botmaze night " + string(_M.botMaze) + " invalid -> using night " + string(_mn)); }
+        global.Night = _mn; coop_prepare_night();
         var _rooms = [MinigameMaze_1, MinigameMaze_2, MinigameMaze_3, MinigameMaze_4, MinigameMaze_5];
-        coop_log("bot: FORCED room jump to " + room_get_name(_rooms[_M.botMaze - 1]) + " (night " + string(_M.botMaze) + ")");
-        room_goto(_rooms[_M.botMaze - 1]);
+        coop_log("bot: FORCED room jump to " + room_get_name(_rooms[_mn - 1]) + " (night " + string(_mn) + ")");
+        room_goto(_rooms[_mn - 1]);
     }
     // maze dialogs (FLAGGED: the bot "presses" forward like input_check_pressed(0) in oTextBox.draw_everything)
     if (_M.botMaze >= 0 || _M.botFace >= 0 || _M.botApproach >= 0 || global.CoopMore.botAdv >= 0) { if (coop_is_maze_room(room) && instance_exists(oTextBox) && current_time - _M.botTxtAt > 700)

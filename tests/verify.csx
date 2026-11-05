@@ -112,7 +112,16 @@ if (stage == "full")
     need(D("gml_GlobalScript_CoopSpec").Contains("function coop_spec_dying_draw(") && D("gml_GlobalScript_CoopSpec").Contains("armedAt") && net.Contains("coop_spec_dying_draw()") && net.Contains("room == Office && global.CoopS.armed"), "S16-B2/B3 dying overlay / alive latch missing");
     need(net.Contains("PAUSE: refused - dialog open") && more.Contains("Finish the dialog first"), "S16-M2 maze dialog pause guard missing");
     need(D("gml_GlobalScript_CoopUI").Contains("Co-op HUD hidden (Tab to show)") && D("gml_Object_oCoopNet_Step_0").Contains("F8: co-op menu is closed during a night") && D("gml_Object_oCoopNet_Step_0").Contains("hintSeen"), "S16-O1/O2 HUD hint / key feedback missing");
-    need(net.Contains("modver: \"0.8.3\""), "modver not 0.8.3");
+    // 0.8.4 (CRASH-TB / CRASH-GO)
+    var sync4 = D("gml_GlobalScript_CoopSync");
+    need(sync4.Contains("function coop_tb_run_page_funcs(") && sync4.Contains("variable_instance_exists(id, \"CGPFunction\")") && !sync4.Contains("array_length(CGPFunction) > 0"), "CRASH-TB: CGPFunction read without exists guard (oTextBox_Fredbear)");
+    need(sync4.Contains("function coop_tb_arr_at(") && sync4.Contains("SYNC tb: forward failed on "), "CRASH-TB: guarded textbox field reads missing");
+    need(!D("gml_GlobalScript_CoopMore").Contains("array_length(CGPFunction) > 0") && D("gml_GlobalScript_CoopMore").Contains("coop_tb_run_page_funcs()"), "CRASH-TB: bot textbox forward still reads CGPFunction");
+    need(net.Contains("Endless -> global.Deaths back to a number") && net.Contains("global.Night == \"Endless\")\n    {\n        if (!variable_global_exists(\"Deaths\"))"), "CRASH-GO: coop_prepare_night turns Endless Deaths into an array");
+    need(D("gml_GlobalScript_CoopSpec").Contains("var _s = global.CoopS;\n    coop_prepare_night();\n    if (!_s.armed)"), "CRASH-GO: oGameOver Create hook does not fix Deaths first");
+    need(D("gml_Object_oCoopNet_Step_0").Contains("if (room == Office && variable_global_exists(\"Night\"))\n    {\n        coop_prepare_night();\n    }"), "CRASH-GO: Office entry does not prepare Deaths");
+    need(D("gml_GlobalScript_CoopMore").Contains("invalid -> using night "), "botmaze night clamp missing");
+    need(net.Contains("modver: \"0.8.4\""), "modver not 0.8.4");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");
