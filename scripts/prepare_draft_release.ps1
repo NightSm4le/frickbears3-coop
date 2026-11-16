@@ -8,7 +8,7 @@ $rels = Invoke-RestMethod -Uri "$api/releases?per_page=100" -Headers $H
 if ($rels | Where-Object { $_.tag_name -eq "v0.8.5" }) { throw "release v0.8.5 already exists - refusing to duplicate" }
 $tags = Invoke-RestMethod -Uri "$api/tags?per_page=100" -Headers $H
 if ($tags | Where-Object { $_.name -eq "v0.8.5" }) { throw "tag v0.8.5 already exists - refusing to duplicate" }
-$body = Get-Content -LiteralPath "$Repo/docs/RELEASE_0.8.5.md" -Raw
+$body = [IO.File]::ReadAllText("$Repo/docs/RELEASE_0.8.5.md", [System.Text.Encoding]::UTF8)
 $payload = @{ tag_name = "v0.8.5"; target_commitish = "master"; name = "FB3 Co-op 0.8.5"; body = $body; draft = $true; prerelease = $false } | ConvertTo-Json -Depth 4
 $rel = Invoke-RestMethod -Method Post -Uri "$api/releases" -Headers $H -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($payload))
 Write-Output "DRAFT CREATED id=$($rel.id) url=$($rel.html_url) draft=$($rel.draft)"
