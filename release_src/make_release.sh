@@ -2,7 +2,7 @@
 # Rebuild the release zip from installer/patches (manifest-driven, 4 bases x 2 variants).
 # No game files go into the zip: only xdelta patches, the official xdelta3 tool, launchers and docs.
 set -e; cd "$(dirname "$0")"; R=$PWD; W=$(cd ../.. && pwd -W)
-VER=${VER:-0.8.5}
+VER=${VER:-0.8.6}
 P=$W/build/pkg/FB3-Coop-$VER
 rm -rf "$P"; mkdir -p "$P"
 cp "$R/../installer/tools/xdelta3.exe" "$P/xdelta3.exe"

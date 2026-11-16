@@ -131,6 +131,24 @@ if (stage == "full")
     g.QueueFindReplace("gml_Object_oGameOver_Draw_0", "format_as_timer(min(global.TimeOfDeath, 359.99), true);", "format_as_timer(min(coop_tod(), 359.99), true);");
 }
 
+// 0.8.6: forward office audio to the spectator - rewrite vanilla audio calls to the coop wrappers
+// (Coop* scripts are skipped: the wrappers themselves and the receiver must call the real functions).
+if (stage == "full" || overlay)
+{
+    int audioRewrites = 0;
+    foreach (var c in Data.Code)
+    {
+        if (c.ParentEntry != null) continue;
+        string n = c.Name.Content;
+        if (n.StartsWith("gml_GlobalScript_Coop") || n.StartsWith("gml_Object_oCoopNet")) continue;
+        g.QueueFindReplace(n, "audio_play_sound(", "coop_audio_play(");
+        g.QueueFindReplace(n, "audio_stop_sound(", "coop_audio_stop(");
+        g.QueueFindReplace(n, "audio_stop_all(", "coop_audio_stop_all(");
+        audioRewrites++;
+    }
+    Console.WriteLine($"[apply] audio forwarding queued for {audioRewrites} code entries");
+}
+
 // 0.7.3: sit/crouch toggle (C / Ctrl) in the 3D maze, via the original Sneak (Freeroam) crouch
 {
     string mz = "gml_Object_oCamera3DMaze_Step_0";

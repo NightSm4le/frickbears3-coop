@@ -50,6 +50,19 @@ if (coop_is_host() && _c.connected && room == Office && current_time - _c.lastCl
     _c.lastClockSend = current_time;
     coop_send({ t: "clock", timer: (variable_global_exists("Timer") ? global.Timer : 0) });
 }
+// 0.8.6: pause-menu "restart night" does room_restart in the Office - no room change, but the clock jumps back.
+// oCoopNet is persistent, so a big Timer drop HERE means this side restarted -> the partner must follow (dead or alive).
+if (_c.connected && room == Office && _c.prevRoom == Office && variable_global_exists("Timer"))
+{
+    if (_c.lastOfficeTimer >= 0 && _c.lastOfficeTimer - global.Timer > 10 && current_time - _c.clockResetAt > 3000)
+    {
+        coop_log("RESTART: night restarted here (timer " + string(_c.lastOfficeTimer) + " -> " + string(global.Timer) + ") -> partner follows");
+        coop_send({ t: "nrestart", night: global.Night });
+        _c.lastOfficeTimer = -1;
+    }
+    else { _c.lastOfficeTimer = global.Timer; }
+}
+else if (room != Office) { _c.lastOfficeTimer = -1; }
 // --- partner snapshot ~10/s ---
 if (_c.connected && current_time - _c.lastSnapSend >= 100)
 {
@@ -85,6 +98,27 @@ if (_c.bot)
         coop_log("bot: closed both doors at timer " + string(global.Timer));
     }
     BotOfficeFrames = (room == Office) ? BotOfficeFrames + 1 : 0;
+    if (_c.botRestart >= 0 && !BotRestartDone && room == Office && variable_global_exists("Timer") && global.Timer >= _c.botRestart)
+    {
+        BotRestartDone = true;
+        coop_log("bot: RESTART NIGHT at timer " + string(global.Timer) + " (same as the pause menu)");
+        room_restart();
+    }
+    if (_c.bot6am >= 0 && !Bot6amDone && room == Office && variable_global_exists("Timer") && global.Timer >= _c.bot6am)
+    {
+        Bot6amDone = true;
+        global.Timer = 359.5; global.Progress = 359.5;
+        if (variable_global_exists("AILevels")) { global.AILevels[80] = max(global.AILevels[80], 5); }
+        if (!instance_exists(oBlank)) { instance_create_depth(0, 0, 0, oBlank); }
+        coop_log("bot: 6AM TEST - clock at 5:59, Blank (id 80) active, no beartraps -> the vanilla end-of-night kill must land");
+    }
+    if (_c.botLatch >= 0 && !BotLatchDone && room == Office && variable_global_exists("Timer") && global.Timer >= _c.botLatch)
+    {
+        BotLatchDone = true;
+        global.Timer = 359.5; global.Progress = 359.5;
+        if (instance_exists(oCamera)) { oCamera.Block6AMTransition = true; }
+        coop_log("bot: LATCH TEST - clock at 5:59 with Block6AMTransition stuck and no killer -> the watchdog must clear it");
+    }
     if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && ((is_real(global.Night) && global.Timer >= _c.botWin) || (!is_real(global.Night) && BotOfficeFrames >= _c.botWin * 60))) // 0.6.0: Custom/Endless timer is not a 0-based clock -> use seconds in Office
     {
         BotWinDone = true;

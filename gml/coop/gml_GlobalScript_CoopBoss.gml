@@ -111,7 +111,7 @@ function coop_boss_roles_draw()
     var _R = global.CoopBR, _gw = display_get_gui_width();
     var _dis = coop_boss_role_me() == "distract";
     var _t1, _t2, _col;
-    if (global.CoopS.spec) { _t1 = "YOU ARE DOWN"; _t2 = "Watch and mark for the partner - a revive brings you back"; _col = make_color_rgb(200, 196, 188); }
+    if (global.CoopS.spec) { _t1 = "YOU ARE DOWN"; _t2 = "Watch for the partner - a revive brings you back"; _col = make_color_rgb(200, 196, 188); }
     else if (_R.solo) { _t1 = "SOLO - PARTNER DOWN"; _t2 = "Role bonus off, the boss is enraged - flash him yourself"; _col = make_color_rgb(230, 70, 60); }
     else if (_dis) { _t1 = "YOUR ROLE: DISTRACT"; _t2 = coop_boss_flashing() ? "Holding him: pushback +60%, P2's Salvage is slowed" : "Flash Salvage: +60% pushback, 60% damage"; _col = make_color_rgb(230, 120, 40); }
     else { _t1 = _R.win ? "YOUR ROLE: HIT  -  WINDOW x1.7" : "YOUR ROLE: HIT"; _t2 = _R.win ? "P1 holds Salvage - flash him NOW" : "Flash Salvage: 130% damage, 170% while P1 distracts"; _col = make_color_rgb(120, 200, 90); }

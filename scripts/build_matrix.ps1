@@ -32,7 +32,7 @@ foreach ($bn in $bases.Keys) {
   }
 }
 $manifest = [ordered]@{
-  version = "0.8.5"
+  version = "0.8.6"
   bases = @($bases.Keys | ForEach-Object { [ordered]@{ name = $_; sha = $bases[$_].sha } })
   targets = $targets
 }

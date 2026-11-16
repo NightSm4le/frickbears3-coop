@@ -1,4 +1,4 @@
-Freakbear 3 Co-op 0.8.5
+Freakbear 3 Co-op 0.8.6
 Unofficial Co-op Modification for Freakbear 3.
 
 This installer adds two-player co-op to YOUR copy of Five Nights at Frickbear's 3 + Four Layers Down v2.1.5. It does not contain or distribute the game itself.
@@ -14,7 +14,7 @@ Supported base versions (data.win):
   - Coop_Install 0.7.2 for v2.1.5 (public release zip)
   - co-op 0.8.2 (standard)
   - co-op 0.8.2 UnlockAll
-  - an already installed co-op 0.8.5 (reinstall / variant switch, using the backup)
+  - an already installed co-op 0.8.5 / 0.8.6 (reinstall / variant switch, using the backup)
 Old tester base "988a...": first apply the official v0.8.2 patch from the v0.8.2 release (it converts 988a to 0.8.2), then run this installer.
 
 Before you continue:

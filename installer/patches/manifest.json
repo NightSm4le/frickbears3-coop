@@ -1,5 +1,5 @@
 ﻿{
-    "version":  "0.8.5",
+    "version":  "0.8.6",
     "bases":  [
                   {
                       "name":  "clean215",
@@ -22,66 +22,66 @@
                     {
                         "base":  "clean215",
                         "variant":  "std",
-                        "out":  "a080be1f6add8e83a725ac380459a25c7a09a8003d883322331252f577b5ec1b",
+                        "out":  "9697eb092fe228a5186d3804eda7374da85ec5987d92cab3eff39746ebdb2a4d",
                         "patch":  "p_clean215_std.xdelta",
                         "file":  "C:\\Users\\PC\\Documents\\Qoder\\2026-11-16\\6be70bbf/build/matrix/clean215_std.win",
-                        "patchSha":  "1bb2b24b51891aee14ac17f3698eeba066161e0a0b5515a456fb683b607630e1"
+                        "patchSha":  "442bb60f22f13a52d64d4627965673a3e89f5278bdf591fb978cd865372167cd"
                     },
                     {
                         "base":  "clean215",
                         "variant":  "unlock",
-                        "out":  "9515ef9bba39d442000c24482951b44a3e2a5b8526cc23fb3b70b83142df7fa0",
+                        "out":  "f0e7c1d55f1afa3eecfbf0d11528e1752a3f7506cec9fc3ff2f40f8a7c34dd6d",
                         "patch":  "p_clean215_unlock.xdelta",
                         "file":  "C:\\Users\\PC\\Documents\\Qoder\\2026-11-16\\6be70bbf/build/matrix/clean215_unlock.win",
-                        "patchSha":  "3d7461ee19d6080cd1b7cb27b9c7d125c7241a632bb6c217a65415e4180564c7"
+                        "patchSha":  "27a7c2f721e8a8a797c30eb75488ff686e83c2ace3b7d0ca6b8332dbb6152dc9"
                     },
                     {
                         "base":  "coop072",
                         "variant":  "std",
-                        "out":  "6caefd3dda4fb040c09c446967d4e3edc89c7bef53985fc4e4bd5e236cd10766",
+                        "out":  "12308ef2050a8384a5a4bce2487f13f466269389ae777095c0db04db4a52735a",
                         "patch":  "p_coop072_std.xdelta",
                         "file":  "C:\\Users\\PC\\Documents\\Qoder\\2026-11-16\\6be70bbf/build/matrix/coop072_std.win",
-                        "patchSha":  "924d7d0e95639e4ba66284239a5404612243d7f62c018a6d2464abdc55fc47e9"
+                        "patchSha":  "f7ad75593e92254c6f750a78313e46a56ccb397def749f978a29d28d1431270f"
                     },
                     {
                         "base":  "coop072",
                         "variant":  "unlock",
-                        "out":  "da585c8e03bbf9f0f86cd3803df617ca68977b011bf06c8cac47f26e964d61b0",
+                        "out":  "b83a35f16965174c165a7ccbbe85c9319fad550418e7fdeee0add1ec5d7d781c",
                         "patch":  "p_coop072_unlock.xdelta",
                         "file":  "C:\\Users\\PC\\Documents\\Qoder\\2026-11-16\\6be70bbf/build/matrix/coop072_unlock.win",
-                        "patchSha":  "0be5151000c11e531d45ad07b9583413a984ec3d684417f91ca475e8699ebf40"
+                        "patchSha":  "b2154cca42a8422009d1209f6b93187932894e3c60cd4fe9aca2a1db85a7228b"
                     },
                     {
                         "base":  "std082",
                         "variant":  "std",
-                        "out":  "e7c8367be2cfa460e1a6a917db023c01569b67bab94eb761d108f62d3b77f4ee",
+                        "out":  "095e8d6b54e6ac104e265c204504ab43c058a80395a101516cbce574df90ce08",
                         "patch":  "p_std082_std.xdelta",
                         "file":  "C:\\Users\\PC\\Documents\\Qoder\\2026-11-16\\6be70bbf/build/matrix/std082_std.win",
-                        "patchSha":  "71bb63e20f2f506839256ce100f1e22db976de789a7ba2526620cf3b91839fa9"
+                        "patchSha":  "3527d9e8cccf366c70ba4ee99ce9bbbd1307053f2ca993062ff7b6f7b97eae2a"
                     },
                     {
                         "base":  "std082",
                         "variant":  "unlock",
-                        "out":  "749b3a18ddce8e743d54470a72e5407ef2fa1f8fb194e62067f180e2adbbd4ee",
+                        "out":  "064dd82d9a67c08d550df15731eaae2725141f0a2316b67ecde5535004463664",
                         "patch":  "p_std082_unlock.xdelta",
                         "file":  "C:\\Users\\PC\\Documents\\Qoder\\2026-11-16\\6be70bbf/build/matrix/std082_unlock.win",
-                        "patchSha":  "4cad9c9c2bdefa9cc98a0b485a00822f465dcbb75410c31f88968e3b66abbe58"
+                        "patchSha":  "cad605bd6ec376969dabc0e729cb3238640b11539029625e340cc034bbefcb45"
                     },
                     {
                         "base":  "unlock082",
                         "variant":  "std",
-                        "out":  "ab4234ca7910b3f53a259642b086fc5c9e0f5d5c121c956ca12b3ae87f028045",
+                        "out":  "78a3a5021a16d12305f15a3c338c374ad282c81f61e97999a056e6f4299f0545",
                         "patch":  "p_unlock082_std.xdelta",
                         "file":  "C:\\Users\\PC\\Documents\\Qoder\\2026-11-16\\6be70bbf/build/matrix/unlock082_std.win",
-                        "patchSha":  "0d9303a862b7ed68d5816d0e19fddc8bd92b9a959c02a3cf1146842ad4364eff"
+                        "patchSha":  "cc692f3be0761ff954a22185083a878a460088ee18d894dd24488522efbb06d5"
                     },
                     {
                         "base":  "unlock082",
                         "variant":  "unlock",
-                        "out":  "184ac9511a7b576288896f525f6f7e44ebf18298a59560c32e22468f256393ce",
+                        "out":  "05b5b8823554003c052decd492da0bd211456c7d21bc97fa9d5a638d89b68da2",
                         "patch":  "p_unlock082_unlock.xdelta",
                         "file":  "C:\\Users\\PC\\Documents\\Qoder\\2026-11-16\\6be70bbf/build/matrix/unlock082_unlock.win",
-                        "patchSha":  "0dc45abe409c402b8f42de515acb380676c4823e4c78c76d8f8165465bac89ce"
+                        "patchSha":  "8ac7884ae380981dad7041c0f68596c81708753c1a609349a0b1db842b7d7afa"
                     }
                 ]
 }

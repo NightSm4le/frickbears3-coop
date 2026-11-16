@@ -1,5 +1,5 @@
 #define MyAppName "Freakbear 3 Co-op"
-#define MyAppVersion "0.8.5"
+#define MyAppVersion "0.8.6"
 #define MyAppPublisher "NightSm4le"
 #define MyAppURL "https://github.com/NightSm4le/frickbears3-coop"
 #include "matrix.iss"
@@ -299,7 +299,7 @@ begin
       Abort;
     end;
     WizardForm.ProgressGauge.Position := 95;
-    LogLine('installed 0.8.5 variant=' + Variant + ' base=' + BaseName + ' out=' + OutSha);
+    LogLine('installed 0.8.6 variant=' + Variant + ' base=' + BaseName + ' out=' + OutSha);
   end;
 end;
 

@@ -347,6 +347,15 @@ function coop_jumpscare_gate(_id)
     if (!coop_active() || !global.Coop.connected || room != Office || !is_numeric(_id) || _id < 0 || _id > 200) { return false; }
     var _a = global.CoopA;
     if (global.CoopF.forceJs) { _a.lastKiller = _id; coop_log("jumpscare(" + coop_anim_name(_id) + ") forced (joint door event)"); return false; }
+    // 0.8.6: end-of-night killers bypass the token gate (and revive invulnerability). oCamera latches
+    // Block6AMTransition when jumpscare_at_6AM() fires; a cancelled kill left the night stuck past 6 AM forever.
+    if (variable_global_exists("Progress") && variable_global_exists("ProgressToMake")
+        && global.Progress >= global.ProgressToMake && (array_contains(end_of_night_killers(), _id) || _id == 119))
+    {
+        _a.lastKiller = _id; _a.st.jumpscares++;
+        coop_log("GATE: 6AM kill by " + coop_anim_name(_id) + " passes (end of night, no token gate)");
+        return false;
+    }
     if (current_time < global.CoopF.invulUntil)
     {
         coop_log("GATE: jumpscare by " + coop_anim_name(_id) + " cancelled - revived player is invulnerable");

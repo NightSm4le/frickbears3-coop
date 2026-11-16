@@ -4,8 +4,8 @@ function Sha($p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLower
 $m = Get-Content "$Repo/installer/patches/manifest.json" -Raw | ConvertFrom-Json
 $z = "$Work/testgame/zip085"
 Remove-Item $z -Recurse -Force -ErrorAction SilentlyContinue
-Expand-Archive -LiteralPath "$Work/dist/FB3-Coop-0.8.5.zip" -DestinationPath $z -Force
-$pkg = "$z/FB3-Coop-0.8.5"
+Expand-Archive -LiteralPath "$Work/dist/FB3-Coop-0.8.6.zip" -DestinationPath $z -Force
+$pkg = "$z/FB3-Coop-0.8.6"
 $g = "$Work/testgame/game"
 $before = Sha "$g/data.win"
 $cur = $before

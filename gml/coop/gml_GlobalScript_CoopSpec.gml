@@ -13,16 +13,16 @@ global.CoopS = {
     frameSurf: -1, fw: 0, fh: 0, framesIn: 0, lastFrameAt: 0, fpsT: 0, fpsN: 0, rfps: 0, inLevel: -1, ackQ: [], botLag: 0,
     // sender
     capSurf: -1, seq: 0, ackSeq: 0, sentAt: array_create(64, 0), level: 3, lastSend: -100000, lastAdapt: 0,
-    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 512, sending: false,
-    rxBytesWin: 0, rxKbps: 0, rxRateAt: 0, lastFrameSize: 0,
+    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 1024, sending: false,
+    rxBytesWin: 0, rxKbps: 0, rxRateAt: 0, lastFrameSize: 0, sndIn: 0,
     // help
     cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0, hintSeen: false,
     specGiveUsedKey: "", specGiveRecvKey: "", specGivePending: false, specGiveRequestKey: "",
     botHelp: -1, botHelpStep: 0, botHelpAt: 0, botDie: -1, botDieDone: false, botDieAt: 0, shotPend: "", shotAt: 0, specShot: false, btnShot: false,
     st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, warn: 0, lure: 0, giveIn: 0, warnIn: 0, lureIn: 0, refunds: 0 }
 };
-// [w, h, interval ms]
-#macro COOP_LV [[1920, 1080, 120], [1280, 720, 100], [960, 540, 100], [640, 360, 100], [480, 270, 100], [320, 180, 120], [256, 144, 150]]
+// [w, h, interval ms] - 0.8.6: faster mid tiers (the old 100 ms cap read as ~9 fps) and a 1 MB/s budget
+#macro COOP_LV [[1920, 1080, 100], [1280, 720, 85], [960, 540, 66], [640, 360, 50], [480, 270, 50], [320, 180, 66], [256, 144, 80]]
 
 function coop_spec_parse_args()
 {
@@ -103,7 +103,7 @@ function coop_spec_gameover_create()
     if (coop_partner_alive_in_office())
     {
         _s.spec = true; _s.specSince = current_time; _s.partnerDeadSince = -1; _s.st.specIn++;
-        _s.framesIn = 0; _s.inLevel = -1; _s.ackQ = [];
+        _s.framesIn = 0; _s.inLevel = -1; _s.ackQ = []; _s.sndIn = 0;
         _s.fpsN = 0; _s.rfps = 0; _s.fpsT = current_time;
         _s.rxBytesWin = 0; _s.rxKbps = 0; _s.rxRateAt = current_time; _s.lastFrameSize = 0;
         application_surface_draw_enable(true);
@@ -130,6 +130,7 @@ function coop_spec_win()
 {
     var _s = global.CoopS;
     _s.spec = false; _s.skipped = false; _s.st.specWin++;
+    audio_stop_all(); // 0.8.6: stop forwarded office loops
     coop_log("SPECTATOR: partner survived to 6 AM -> NightClear here too (night " + string(global.Night) + ", host=" + string(coop_is_host()) + ")");
     // NightClear draws global.Freezeframe: use the last streamed frame
     var _w = display_get_gui_width(), _h = display_get_gui_height();
@@ -150,9 +151,22 @@ function coop_spec_lose(_why)
 {
     var _s = global.CoopS;
     _s.spec = false; _s.st.specLose++;
+    audio_stop_all(); // 0.8.6: stop forwarded office loops
     coop_log("SPECTATOR: " + _why + " -> both dead, GameOver for real");
     coop_spec_count_now();
     room_restart();
+}
+
+// 0.8.6: the partner restarted the same night while I was spectating -> a fresh night revives me (no death counted)
+function coop_spec_follow_restart()
+{
+    var _s = global.CoopS;
+    _s.spec = false; _s.skipped = false; _s.armed = false; _s.partnerDeadSince = -1;
+    audio_stop_all(); // 0.8.6: stop forwarded office loops
+    coop_log("SPECTATOR: partner restarted the night -> following into a fresh night (death stays uncounted)");
+    coop_prepare_night();
+    if (variable_global_exists("Night") && global.Night == "Endless") { room_goto(Office); }
+    else { room_goto(NightOpening); }
 }
 
 // oCoopNet Step
@@ -200,17 +214,48 @@ function coop_spec_step()
     while (array_length(_s.ackQ) > 0 && current_time >= _s.ackQ[0][0]) { coop_send({ t: "fack", s: _s.ackQ[0][1] }); array_delete(_s.ackQ, 0, 1); }
     if (_s.shotPend != "" && current_time >= _s.shotAt) { coop_log("SHOT " + _s.shotPend); _s.shotPend = ""; }
     if (!_s.spec) { return; }
-    if (room != GameOver) { _s.spec = false; coop_log("SPECTATOR: left GameOver room -> spectator off"); return; }
+    if (room != GameOver) { _s.spec = false; audio_stop_all(); coop_log("SPECTATOR: left GameOver room -> spectator off"); return; }
     if (!_c.connected) { coop_spec_lose("partner disconnected"); return; }
     if (_c.partnerWon || coop_partner_get("rm", "") == "NightClear") { coop_spec_win(); return; }
     var _pdead = current_time - _c.partnerSnapAt < 3000 && (!coop_partner_get("alive", true) || coop_partner_get("sp", 0) || coop_partner_get("rm", "Office") == "GameOver");
     if (_pdead) { if (_s.partnerDeadSince < 0) { _s.partnerDeadSince = current_time; } else if (current_time - _s.partnerDeadSince > 500) { coop_spec_lose("partner died too"); return; } }
     else { _s.partnerDeadSince = -1; }
-    if (keyboard_check_pressed(ord("P"))) { coop_send_ping(); }
     if (keyboard_check_pressed(ord("G")) && coop_help_key_free(ord("G"))) { coop_spec_give_power("key G"); }
     coop_spec_give_click();
     if (_c.bot && !_s.specShot && _s.framesIn > 3 && current_time - _s.specSince > 6000) { _s.specShot = true; coop_send_ping(); coop_log("SHOT spectator"); }
     if (current_time - _s.fpsT >= 2000) { _s.rfps = _s.fpsN * 1000 / max(1, current_time - _s.fpsT); _s.fpsN = 0; _s.fpsT = current_time; }
+}
+
+// ---------- 0.8.6: office audio forwarded to the spectator ----------
+// apply.csx rewrites vanilla audio_play_sound/stop calls to these wrappers. Local playback keeps EVERY
+// original argument (falloff/pitch/listener); only id/priority/loops go over the wire - both sides run the
+// same game build, so sound asset indices match. The receiver plays them only while spectating.
+function coop_audio_play(_s, _p, _l, _a = undefined, _b = undefined, _c = undefined, _d = undefined, _e = undefined, _f = undefined, _g = undefined)
+{
+    // vanilla callers keep the returned sound id (audio_sound_gain/pitch/stop on it) - pass it through
+    var _r;
+    if (_g != undefined) { _r = audio_play_sound(_s, _p, _l, _a, _b, _c, _d, _e, _f, _g); }
+    else if (_f != undefined) { _r = audio_play_sound(_s, _p, _l, _a, _b, _c, _d, _e, _f); }
+    else if (_e != undefined) { _r = audio_play_sound(_s, _p, _l, _a, _b, _c, _d, _e); }
+    else if (_d != undefined) { _r = audio_play_sound(_s, _p, _l, _a, _b, _c, _d); }
+    else if (_c != undefined) { _r = audio_play_sound(_s, _p, _l, _a, _b, _c); }
+    else if (_b != undefined) { _r = audio_play_sound(_s, _p, _l, _a, _b); }
+    else if (_a != undefined) { _r = audio_play_sound(_s, _p, _l, _a); }
+    else { _r = audio_play_sound(_s, _p, _l); }
+    if (global.CoopS.sending) { coop_send({ t: "snd", s: _s, p: _p, l: _l }); }
+    return _r;
+}
+
+function coop_audio_stop(_s)
+{
+    audio_stop_sound(_s);
+    if (global.CoopS.sending) { coop_send({ t: "sndstop", s: _s }); }
+}
+
+function coop_audio_stop_all()
+{
+    audio_stop_all();
+    if (global.CoopS.sending) { coop_send({ t: "sndall" }); }
 }
 
 // ---------- stream: sender (alive player, called from Draw GUI End) ----------
@@ -218,7 +263,7 @@ function coop_stream_tick()
 {
     var _s = global.CoopS, _c = global.Coop;
     var _want = room == Office && _c.connected && current_time - _c.partnerSnapAt < 3000 && coop_partner_get("sp", 0);
-    if (!_want) { if (_s.sending) { _s.sending = false; coop_log("stream: stop (frames " + string(_s.framesOut) + ")"); } return; }
+    if (!_want) { if (_s.sending) { _s.sending = false; coop_send({ t: "sndall" }); coop_log("stream: stop (frames " + string(_s.framesOut) + ")"); } return; }
     if (!_s.sending) { _s.sending = true; _s.ackSeq = _s.seq; _s.lastAdapt = current_time; _s.bytesWin = 0; coop_log("stream: start, level " + string(_s.level)); }
     var _lv = COOP_LV;
     var _inflight = _s.seq - _s.ackSeq;
@@ -232,9 +277,9 @@ function coop_stream_tick()
         else if (_s.lat >= 0 && _s.lat < 150 && _inflight < 16 && _s.kbps < _s.budget * 0.5 && _s.level > 0) { _s.level--; _s.st.levelUp++; }
         if (_old != _s.level) { coop_log("stream: level " + string(_old) + " -> " + string(_s.level) + " (" + string(_lv[_s.level][0]) + "x" + string(_lv[_s.level][1]) + " every " + string(_lv[_s.level][2]) + "ms; ack lat " + string(round(_s.lat)) + "ms, " + string_format(_s.kbps, 1, 1) + " KB/s, inflight " + string(_inflight) + ")"); }
     }
-    // Keep at most two video frames queued on the shared TCP socket so control packets
-    // are not stuck behind a backlog of spectator frames.
-    if (_inflight >= 2) { if (current_time - _s.lastSend > 4000) { _s.ackSeq = _s.seq; coop_log("stream: acks stalled 4s, resync"); } return; }
+    // Keep at most three video frames queued on the shared TCP socket so control packets
+    // are not stuck behind a backlog of spectator frames (0.8.6: 2 frames capped fps at ~2/RTT, e.g. 9 fps at 170 ms).
+    if (_inflight >= 3) { if (current_time - _s.lastSend > 4000) { _s.ackSeq = _s.seq; coop_log("stream: acks stalled 4s, resync"); } return; }
     if (current_time - _s.lastSend < _lv[_s.level][2]) { return; }
     var _w = _lv[_s.level][0], _h = _lv[_s.level][1];
     var _src = surface_exists(global.UISurface) ? global.UISurface : application_surface;
@@ -365,10 +410,10 @@ function coop_spec_draw()
     draw_set_halign(fa_left);
     // 0.7.7 (S9-4): the streamed frame carries the partner's own HUD (Power y~336+, Mute Call, Temperature), so the footer
     // lives in the free band above it (y 302..330): hints left of the G button, stream stats right of it.
-    var _fy = _gh - 58, _fl1 = "P: ping   M: mark partner's camera", _fl2 = "Game Over only if both die | 6 AM wins";
-    coop_ui_panel(0, _fy, min(_gr[0] - 4, 8 + max(string_width(_fl1), string_width(_fl2))), _fy + 28);
+    // 0.8.6: footer hint only - the spectator P ping / M mark were removed (useless while watching)
+    var _fy = _gh - 58, _fl2 = "Game Over only if both die | 6 AM wins";
+    coop_ui_panel(0, _fy + 13, min(_gr[0] - 4, 8 + string_width(_fl2)), _fy + 28);
     draw_set_color(c_ltgray);
-    draw_text(4, _fy + 1, _fl1);
     draw_text(4, _fy + 14, _fl2);
     var _st = string(_s.fw) + "x" + string(_s.fh) + " " + string_format(_s.rfps, 1, 1) + "fps" + ((_c.rtt >= 0) ? " " + string(_c.rtt) + "ms" : "") + ((_age > 2000 && _s.framesIn > 0) ? " (stalled)" : "");
     coop_ui_panel(max(_gr[2] + 4, _gw - 8 - string_width(_st)), _fy + 13, _gw, _fy + 28);
@@ -455,6 +500,16 @@ function coop_help_packet(_t, _m)
     switch (_t)
     {
         case "fack": coop_stream_on_ack(_m.s); return true;
+        case "snd":
+            if (_s.spec)
+            {
+                audio_play_sound(_m.s, _m.p, _m.l);
+                _s.sndIn++;
+                if (_s.sndIn == 1) { coop_log("SPECTATOR: partner audio forwarding active (first sound packet)"); }
+            }
+            return true;
+        case "sndstop": if (_s.spec) { audio_stop_sound(_m.s); } return true;
+        case "sndall": if (_s.spec) { audio_stop_all(); } return true;
         case "specgive":
             var _nightKey = string(_m.night), _got = 0;
             if (room == Office && coop_alive() && _nightKey != "" && _s.specGiveRecvKey != _nightKey)

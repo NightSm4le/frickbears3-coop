@@ -53,8 +53,8 @@ if (stage == "full")
     need(more.Contains("expected six 32x64 frames"), "custom co-op art validation missing");
     var spec = D("gml_GlobalScript_CoopSpec");
     need(spec.Contains("DEV STREAM") && spec.Contains("Frames received"), "spectator developer diagnostics missing");
-    need(spec.Contains("budget: 512"), "spectator bandwidth budget missing");
-    need(spec.Contains("level: 3") && spec.Contains("if (_inflight >= 2)"), "spectator stream is not rate-limited to protect control traffic");
+    need(spec.Contains("budget: 1024"), "spectator bandwidth budget missing");
+    need(spec.Contains("level: 3") && spec.Contains("if (_inflight >= 3)"), "spectator stream is not rate-limited to protect control traffic");
     need(spec.Contains("1920, 1080") && spec.Contains("1280, 720"), "1080p adaptive spectator levels missing");
     need(spec.Contains("specgiveack") && spec.Contains("POWER USED"), "spectator once-per-night power assist missing");
     need(spec.Contains("Lure sent to partner; it only works on a nearby animatronic") && spec.Contains("L (partner)"), "L action purpose is unclear");
@@ -125,7 +125,21 @@ if (stage == "full")
     need(more.Contains("var _runTitle") && more.Contains("TaskRunning = _i;"), "CRASH-SCRAP: stasks does not remap TaskRunning");
     need(more.Contains("_B.scrapSent = false;") && more.Contains("_B.scrapTotal = 0;"), "SCRAP-DESYNC: per-night scrap state reset missing");
     need(more.Contains("!coop_is_maze_room(_X.prevRoom) && _X.prevRoom != SalvageResults"), "MAZE-RETURN: Office-entry reset wipes same-night boss state");
-    need(net.Contains("modver: \"0.8.5\""), "modver not 0.8.5");
+    need(net.Contains("modver: \"0.8.6\""), "modver not 0.8.6");
+    // 0.8.6 (live-play fixes: 6AM softlock, restart desync, spectator P/M removal, audio + quality)
+    var spec6 = D("gml_GlobalScript_CoopSpec");
+    var feat6 = D("gml_GlobalScript_CoopFeat");
+    var anim6 = D("gml_GlobalScript_CoopAnim");
+    var step6 = D("gml_Object_oCoopNet_Step_0");
+    need(anim6.Contains("array_contains(end_of_night_killers(), arg0)"), "6AM-FIX: end-of-night killers still token-gated");
+    need(more.Contains("oCamera.Block6AMTransition = false"), "6AM-FIX: Block6AMTransition watchdog missing");
+    need(net.Contains("case \"nrestart\":") && net.Contains("coop_spec_follow_restart()") && step6.Contains("t: \"nrestart\"") && step6.Contains("lastOfficeTimer"), "RESTART-FIX: same-night restart sync missing");
+    need(net.Contains("mod version ") && net.Contains("bad mod version"), "RESTART-FIX: modver handshake check missing");
+    need(!spec6.Contains("P: ping") && !feat6.Contains("key M spectator") && !feat6.Contains("botSpecMark"), "SPEC-PM: spectator ping/mark not removed");
+    need(spec6.Contains("function coop_audio_play(") && spec6.Contains("case \"snd\":") && spec6.Contains("_r = audio_play_sound(arg0, arg1, arg2);") && spec6.Contains("return _r;"), "SPEC-AUDIO: forwarding wrappers/receiver missing or sound id not returned");
+    need(D("gml_Object_oShopItemUltra_Clock_Draw_77").Contains("coop_audio_play("), "SPEC-AUDIO: vanilla audio calls not rewritten");
+    need(spec6.Contains("budget: 1024") && spec6.Contains("[640, 360, 50]") && spec6.Contains("_inflight >= 3"), "SPEC-QUALITY: stream tuning missing");
+    need(more.Contains("run tasks on the control panel"), "SCRAP-HUD: task location hint missing");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");

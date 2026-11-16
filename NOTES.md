@@ -239,3 +239,27 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
   Supported bases: clean v2.1.5 c254b690…, Coop_Install 0.7.2@2.1.5 12405aa0…, 0.8.2 std 726022da…, 0.8.2 unlock 73a46750….
   Tester base 988a… is not published: bridge via the official v0.8.2 patch first.
   Backup name `data.win.coop-original` (never overwritten); uninstall restores it. No game files in installer/zip.
+
+## 0.8.6 (live-play fixes, 2026-11-17)
+- 6AM-SOFTLOCK: `coop_jumpscare_gate` cancelled the vanilla end-of-night killers (`end_of_night_killers()` = 6, 26, 42, 62, 73, 72, 80, 81, plus 119)
+  while `oCamera` had already latched `Block6AMTransition` (BeartrapTanks < 0) -> clock ran past 6 AM forever. Those kills now bypass the token gate
+  and revive invulnerability (and set `lastKiller`, so the death name survives). Safety net: `coop_more_step` watchdog clears a stuck
+  `oCamera.Block6AMTransition` after 5 s with no `oJumpscare`/`oFredbear_EndingScare` running ("6AM: Block6AMTransition cleared").
+- RESTART-DESYNC: pause-menu "restart night" is a `room_restart` inside Office (no room change), so a dead partner kept spectating the old night.
+  `oCoopNet` is persistent: a Timer drop > 10 s between two Office steps (guarded by `clockResetAt` for Ultra Clock / win / Endless round resets,
+  and by clock-sync drops updating `lastOfficeTimer`) sends `nrestart`; the receiver follows: spectator -> `coop_spec_follow_restart()`
+  (fresh night, death stays uncounted), alive -> `room_restart()`. Handshake now rejects a mismatched `modver` ("bad mod version").
+- SPEC-PM: spectator P ping overlay and M mark removed (keys, receiver branch, bot spec-mark flag); footer keeps only the win-rule hint.
+- SPEC-QUALITY: stream budget 512 -> 1024 KB/s, inflight cap 2 -> 3 (2 frames in flight capped fps at ~2/RTT), ladder intervals retuned to
+  10-20 fps per level (`COOP_LV` 1080p@100ms ... 360p@50ms). Live: adaptive climb 360p -> 540p -> 720p -> 1080p on localhost.
+- SPEC-AUDIO: vanilla `audio_play_sound/stop_sound/stop_all` calls rewritten to `coop_audio_play/stop/stop_all` wrappers (apply.csx, all non-Coop
+  entries); wrappers forward `snd/sndstop/sndall` packets while streaming and RETURN the sound id (oEnnard Create does audio_sound_gain on it -
+  first smoke build crashed there without the return). Receiver plays only while spectating; `audio_stop_all` on every spec-exit path and on stream stop.
+- SCRAP-HUD: oScraptrap is a REGULAR vanilla animatronic (id 63), not a boss; tasks run on the control panel at the back of the office.
+  HUD line now says "run tasks on the control panel, back of office".
+- Test flags: `-coop-botrestart T` (room_restart at timer T), `-coop-bot6am T` (clock to 5:59 + Blank id 80 active), `-coop-botlatch T`
+  (clock to 5:59 with Block6AMTransition stuck, no killer).
+- Live pair tests (two Windows instances, localhost, bot flags): T1 death->spectator + audio packets + 1080p stream + host restart followed by the
+  dead partner; T2/T3 alive partner follows a restart in both directions; T4 6AM kill passes the gate on both sides, killer name kept, GameOver,
+  clock frozen at 362.5; T5 stuck latch cleared by the watchdog on both sides -> win_night -> NightClear.
+- proto 8 unchanged, modver 0.8.6 (now enforced at handshake).

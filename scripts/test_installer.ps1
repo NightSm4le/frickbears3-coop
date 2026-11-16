@@ -1,5 +1,5 @@
 param(
-  [string]$Setup = (Resolve-Path "$PSScriptRoot/../../dist/Freakbear3Coop-0.8.5-Setup.exe").Path,
+  [string]$Setup = (Resolve-Path "$PSScriptRoot/../../dist/Freakbear3Coop-0.8.6-Setup.exe").Path,
   [string]$GameSrc = "C:/Users/PC/Desktop/frickbears3-4ld-v2.1.5 (1)",
   [string]$Work = (Resolve-Path "$PSScriptRoot/../..").Path,
   [switch]$SkipBoot

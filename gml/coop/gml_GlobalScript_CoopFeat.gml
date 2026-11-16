@@ -17,7 +17,7 @@ global.CoopF = {
     // warn self-test
     botWarnSelf: -1, warnSelfStep: 0, warnSelfAt: 0,
     // remote lure proof
-    botRlure: -1, rlureNext: 0, rlureN: 0, rlureHit: false, botSpecMark: -1, botSpecMarkDone: false
+    botRlure: -1, rlureNext: 0, rlureN: 0, rlureHit: false
 };
 
 function coop_feat_parse_args()
@@ -34,7 +34,6 @@ function coop_feat_parse_args()
         else if (_p == "-coop-botjdclose" && i + 1 < _n) { i++; _f.botJdClose = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botwarnself" && i + 1 < _n) { i++; _f.botWarnSelf = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botrlure" && i + 1 < _n) { i++; _f.botRlure = coop_arg_num(parameter_string(i), 0); }
-        else if (_p == "-coop-botspecmark" && i + 1 < _n) { i++; _f.botSpecMark = coop_arg_num(parameter_string(i), 0); }
     }
 }
 
@@ -589,28 +588,21 @@ function coop_feat_packet(_t, _m)
 // ---------------- step / draw ----------------
 function coop_feat_step()
 {
-    var _f = global.CoopF, _c = global.Coop, _s = global.CoopS;
+    var _f = global.CoopF, _c = global.Coop;
     if (global.CoopSaveTag != "" && _c.mode == "off" && _c.rjLeft <= 0 && room == TitleScreenMap && !coop_admin_save_active()) { coop_save_leave(); } // 0.6.2: not while auto-reconnecting
     if (variable_struct_exists(_f, "unlockAll") && _f.unlockAll && global.CoopSaveTag != "") { coop_unlock_all(); }
     if (!_c.connected) { return; }
-    // marks: M on cameras (alive) or as spectator (marks what the partner is watching)
+    // marks: M on cameras (alive players only; 0.8.6: the spectator mark was removed as useless)
     var _mk = keyboard_check_pressed(ord("M")) && coop_help_key_free(ord("M"));
     if (_mk)
     {
         if (room == Office && coop_alive() && variable_global_exists("CamUp") && global.CamUp && variable_global_exists("Cam")) { coop_mark_send(global.Cam, "key M"); }
-        else if (_s.spec && coop_partner_get("cu", 0)) { coop_mark_send(coop_partner_get("cam", 0), "key M spectator"); }
     }
     if (_c.bot && _f.botMark >= 0 && !_f.botMarkDone && room == Office && coop_alive() && global.Timer >= _f.botMark && coop_partner_alive_in_office())
     {
         _f.botMarkDone = true;
         global.CamUp = 1; global.MonitorSystem = "Cameras";
         coop_mark_send(global.Cam, "bot");
-    }
-    if (_c.bot && _f.botSpecMark >= 0 && !_f.botSpecMarkDone && _s.spec && coop_partner_get("cu", 0) && coop_partner_get("tm", 0) >= _f.botSpecMark)
-    {
-        _f.botSpecMarkDone = true;
-        coop_mark_send(coop_partner_get("cam", 0), "bot spectator");
-        coop_log("SHOT mark_spec");
     }
     if (_f.markShotAt > 0 && current_time > _f.markShotAt) { _f.markShotAt = 0; coop_log("SHOT mark_seen cam=" + string(global.Cam)); }
     if (_c.bot && array_length(_f.marks) > 0 && room == Office && coop_alive()) { var _mm = _f.marks[array_length(_f.marks) - 1]; if (current_time < _mm.till) { global.CamUp = 1; global.MonitorSystem = "Cameras"; global.Cam = _mm.cam; } }

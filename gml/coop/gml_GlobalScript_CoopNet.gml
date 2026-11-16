@@ -4,7 +4,7 @@
 
 global.Coop = {
     proto: 8,
-    modver: "0.8.5",
+    modver: "0.8.6",
     rjLeft: 0,           // 0.6.2: auto-reconnect attempts left (client)
     rjAt: 0,
     rjN: 0,
@@ -26,6 +26,9 @@ global.Coop = {
     logFile: "coop.log",
     lastClockSend: 0,
     lastClientClockReset: -100000,
+    // 0.8.6: same-night restart detection (persistent oCoopNet sees the Timer drop after room_restart)
+    lastOfficeTimer: -1,
+    clockResetAt: -100000, // Ultra Clock / win / round transition: intentional clock resets, not a restart
     hostTimer: -1,
     hostNight: undefined,
     partnerWon: false,
@@ -60,7 +63,10 @@ global.Coop = {
     botShot: "",
     botShotIdx: -1,
     botShotAt: 0,
-    botDie: -1
+    botDie: -1,
+    botRestart: -1,
+    bot6am: -1,
+    botLatch: -1
 };
 
 global.CoopPause = { remotePending: false, remoteOpening: false, remotePaused: false, remoteResume: false, localPaused: false, opening: false };
@@ -251,6 +257,9 @@ function coop_parse_args()
         else if (_p == "-coop-botrepel" && i + 1 < _n) { i++; global.CoopA.repelChance = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botlurechance" && i + 1 < _n) { i++; global.CoopA.lureChance = coop_arg_num(parameter_string(i), 0); }
         else if (_p == "-coop-botshots" && i + 1 < _n) { i++; _c.botShots = string_split(parameter_string(i), ","); }
+        else if (_p == "-coop-botrestart" && i + 1 < _n) { i++; _c.botRestart = coop_arg_num(parameter_string(i), 0); } // 0.8.6: restart the night at timer N (tests the partner follow)
+        else if (_p == "-coop-bot6am" && i + 1 < _n) { i++; _c.bot6am = coop_arg_num(parameter_string(i), 0); } // 0.8.6: jump the clock to 5:59 with Blank active (tests the end-of-night kill gate)
+        else if (_p == "-coop-botlatch" && i + 1 < _n) { i++; _c.botLatch = coop_arg_num(parameter_string(i), 0); } // 0.8.6: stick Block6AMTransition at 5:59 with no killer (tests the watchdog)
     }
     coop_spec_parse_args();
     coop_feat_parse_args();
@@ -432,6 +441,8 @@ function coop_on_packet(_m)
             if (!coop_is_host()) { break; }
             if (variable_struct_get(_m, "proto") != _c.proto) { coop_send({ t: "reject", why: "protocol " + string(variable_struct_get(_m, "proto")) + " != " + string(_c.proto) }); coop_log("reject proto"); coop_drop_partner("bad proto"); break; }
             if (variable_struct_get(_m, "game") != global.CurrentVersion) { coop_send({ t: "reject", why: "game version " + string(variable_struct_get(_m, "game")) + " != " + global.CurrentVersion }); coop_drop_partner("bad game version"); break; }
+            // 0.8.6: forwarded spectator audio uses sound asset indices - both sides must run the same mod build
+            if (variable_struct_get(_m, "modver") != _c.modver) { coop_send({ t: "reject", why: "mod version " + string(variable_struct_get(_m, "modver")) + " != " + _c.modver }); coop_log("reject modver"); coop_drop_partner("bad mod version"); break; }
             _c.connected = true;
             _c.status = "partner connected";
             coop_send({ t: "welcome", proto: _c.proto, slot: 2, game: global.CurrentVersion });
@@ -464,6 +475,7 @@ function coop_on_packet(_m)
             if (!coop_is_client()) { break; }
             _c.hostNight = variable_struct_get(_m, "night");
             _c.partnerWon = false;
+            _c.lastOfficeTimer = -1; // 0.8.6: rejoin may set my clock without a restart
             var _oldNight = variable_global_exists("Night") ? global.Night : undefined;
             coop_apply_night(_m);
             coop_s4_host_night(_m);
@@ -480,6 +492,7 @@ function coop_on_packet(_m)
                 var _d = _c.hostTimer - global.Timer;
                 if (abs(_d) > 2) { global.Timer = _c.hostTimer; }
                 else { global.Timer += _d * 0.25; }
+                _c.lastOfficeTimer = global.Timer; // 0.8.6: a clock-sync drop is the HOST restarting, not me
             }
             break;
         case "clockrewind": // host: client used its own Ultra Clock; apply the same fixed game effect
@@ -488,10 +501,20 @@ function coop_on_packet(_m)
                 && current_time - _c.lastClientClockReset > 1000)
             {
                 _c.lastClientClockReset = current_time;
+                _c.clockResetAt = current_time;
                 global.Timer = 360 - (360 / global.NightSpeedup);
                 coop_log("CLOCK: client used Ultra Clock; host timer reset to " + string(global.Timer));
             }
             else { coop_log("CLOCK: rejected invalid, out-of-room, or duplicate client rewind"); }
+            break;
+        case "nrestart": // 0.8.6: partner restarted the SAME night (pause menu) -> follow into a fresh night
+            coop_log("RESTART: partner restarted night " + string(variable_struct_get(_m, "night")) + " -> following");
+            _c.partnerWon = false; _c.partnerWonNight = undefined;
+            _c.lastOfficeTimer = -1;
+            if (global.CoopS.spec) { coop_spec_follow_restart(); }
+            else if (room == Office) { room_restart(); }
+            else if (variable_global_exists("Night") && global.Night == "Endless") { room_goto(Office); }
+            else if (room != NightOpening) { room_goto(NightOpening); }
             break;
         case "snap": // partner office state, ~10 per second
             _c.partner = _m;
@@ -539,6 +562,7 @@ function coop_clock_rewind()
     }
 
     global.Timer = 360 - (360 / global.NightSpeedup);
+    global.Coop.clockResetAt = current_time;
     if (coop_active() && global.Coop.connected)
     {
         if (coop_is_client()) { coop_send({ t: "clockrewind" }); }
@@ -561,6 +585,7 @@ function coop_drop_partner(_why)
 
 function coop_on_win_night()
 {
+    global.Coop.clockResetAt = current_time; // 0.8.6: win / Endless round reset is not a pause-menu restart
     if (global.Coop.connected) { coop_send({ t: "win", night: global.Night, er: (is_numeric(global.Night) ? coop_win_earnings() : 0) }); }
     coop_log("win_night night=" + string(global.Night));
 }

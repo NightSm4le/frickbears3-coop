@@ -32,7 +32,7 @@ global.CoopM = { pauseBlockAt: -100000, sync: false, px: 0, py: 0, pdir: 0, pmov
     caughtP: 0, waitShown: false, botMaze: -1, botMazeDone: false, ghost: false, ghostDone: false, botApproach: -1, botSpawn: -1, botSpawnDone: false, spawnSent: false, puppets: 0, pCaughtAt: 0, botApproachDone: false, botFace: -1, botFaceDone: false, botExit: -1, botExitDone: false, botTxtAt: 0,
     logAt: 0, followed: false, shotAt: 0, targetLog: "", sit: false, psit: 0, botSit: -1, botSitDone: false, botSitUntil: 0, botSitOn: false, mzRoom: -1, mzAt: 0, sitShot: false, sitLog: -1, botSitWait: false, botSitWaitAt: 0 };
 global.CoopE = { pMoney: -1, pBuys: [], buysIn: 0, buysOut: 0, partnerEr: -1, botBuy: -1, botBuyDone: false, shown: 0 };
-global.CoopMore = { pwAt: 0, botAdv: -1, botAdvAt: 0, roomAt: 0, officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
+global.CoopMore = { pwAt: 0, b6At: 0, botAdv: -1, botAdvAt: 0, roomAt: 0, officeAt: 0, shotReq: "", shotAt: 0, prevRoom: -1, botSet: -1, botSetDone: false, botSetStep: 0, botSetAt: 0 };
 
 function coop_more_parse_args()
 {
@@ -871,6 +871,17 @@ function coop_more_bot()
         }
         else { coop_log("bot: purchase of upgrade 1 for $1 REFUSED - not enough money (" + string(_before) + ")"); coop_alert("Not enough money", c_gray, undefined); }
     }
+    // 0.8.6: safety net for the 6 AM softlock - Block6AMTransition latched but no jumpscare / ending scare
+    // actually running means the win can never fire and the clock keeps running past 6 AM. Clear after 5 s.
+    if (room == Office && coop_alive() && variable_global_exists("Progress") && variable_global_exists("ProgressToMake")
+        && global.Progress >= global.ProgressToMake && instance_exists(oCamera)
+        && variable_instance_exists(oCamera, "Block6AMTransition") && oCamera.Block6AMTransition
+        && !instance_exists(oJumpscare) && !instance_exists(oFredbear_EndingScare))
+    {
+        if (_X.b6At == 0) { _X.b6At = current_time; }
+        else if (current_time - _X.b6At > 5000) { _X.b6At = 0; oCamera.Block6AMTransition = false; coop_log("6AM: Block6AMTransition cleared (no jumpscare running) - the win can proceed"); }
+    }
+    else { _X.b6At = 0; }
     // partner reached 6 AM while I am still alive in my office (clock drift / forced win): clear the night here too
     if (room == Office && _c.connected && _c.partnerWon && string(_c.partnerWonNight) == string(global.Night) && coop_alive() && (is_numeric(global.Night) || global.Night == "Custom" || global.Night == "Endless"))
     {
@@ -904,14 +915,15 @@ function coop_more_draw()
     }
     // 0.8.3 (UX-S16-S1/S2): one shared progress line, identical on both sides (total = list size when the host sent /
     // the client received the task list, left = shared remaining tasks); only once the list was synced this night.
-    // Note: oScraptrap itself is spawned by the vanilla AI setup (e.g. Unlock All on Night 1), the mod does not add spawns.
+    // Note: oScraptrap is a REGULAR vanilla animatronic (id 63), spawned by the night's AI setup - not a boss.
+    // Its tasks are run on the control panel in the back of the office; the mod only mirrors the shared progress.
     if (room == Office && _c.connected && _scraptrap != noone && _B.scrapTotal > 0)
     {
         var _ty = (_salvage != noone && global.CoopCfg.bossShared) ? 64 : 48; // below the cam strip and alert banner
         // 0.6.4 (S3-4): with the cams up, centre it over the camera view (right of the cam map and clear of its corner marks)
         var _tx = (variable_global_exists("CamUp") && global.CamUp) ? round(_gw * 0.6875) : _gw / 2;
         var _left = array_length(_scraptrap.Tasks), _tot = max(_B.scrapTotal, _left);
-        var _tt = "SCRAPTRAP  done " + string(_tot - _left) + "/" + string(_tot) + "  (" + string(_left) + " left)", _tw = string_width(_tt) / 2 + 4;
+        var _tt = "SCRAPTRAP  done " + string(_tot - _left) + "/" + string(_tot) + "  (" + string(_left) + " left)  -  run tasks on the control panel, back of office", _tw = string_width(_tt) / 2 + 4;
         coop_ui_panel(_tx - _tw, _ty, _tx + _tw, _ty + 14);
         draw_set_color(c_yellow); draw_set_halign(fa_center); draw_text(_tx, _ty + 1, _tt); draw_set_halign(fa_left);
     }

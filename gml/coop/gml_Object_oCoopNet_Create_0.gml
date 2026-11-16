@@ -14,3 +14,6 @@ IpText = _c.ip;
 PortText = string(_c.port);
 BotKickDone = false;
 BotShotLogged = false;
+BotRestartDone = false;
+Bot6amDone = false;
+BotLatchDone = false;

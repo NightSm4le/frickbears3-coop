@@ -11,7 +11,7 @@ UndertaleModCli 0.9.2.0, and the supported base `data.win` files (your own game 
 | unlock082  | 73a4675086cc       | v0.8.2 release asset `UnlockAll_data.win` |
 
 The tester base `988a2a95…` was never published; it is not supported. Owners can bridge with the
-official v0.8.2 patch (988a → std082) and then install 0.8.5.
+official v0.8.2 patch (988a → std082) and then install 0.8.6.
 
 Steps (from the repository root, PowerShell):
 
@@ -24,7 +24,7 @@ powershell -ExecutionPolicy Bypass -File scripts\test_installer.ps1  # silent in
 ```
 
 `build_matrix.ps1` expects the base files at the paths listed in the script (edit `$bases` if yours differ).
-Output: `dist/Freakbear3Coop-0.8.5-Setup.exe` (two levels above the repo root by default).
+Output: `dist/Freakbear3Coop-0.8.6-Setup.exe` (two levels above the repo root by default).
 
 `installer/tools/xdelta3.exe` is not stored in git (official third-party binary); `fetch_xdelta.ps1`
 downloads it from the xdelta-gpl GitHub release and verifies SHA-256

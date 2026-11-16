@@ -1,13 +1,13 @@
-Freakbear 3 Co-op 0.8.5 is installed.
+Freakbear 3 Co-op 0.8.6 is installed.
 
 Play:
   - Host: run Host.bat in the game folder (or Frickbears3.exe -coop-host -coop-port 7777).
   - Join: run Join.bat on the second PC (or Frickbears3.exe -coop-join <host-ip> -coop-port 7777).
-  - In game: the title menu has Co-op entries; F8 opens the co-op menu during a night.
-  - Both players must run the same mod version (0.8.5).
+  - In game: the title menu has Co-op entries; F8 opens the co-op menu outside a night.
+  - Both players must run the same mod version (0.8.6).
 
 Your original data.win is kept as data.win.coop-original in the game folder.
-To undo: uninstall "Freakbear 3 Co-op 0.8.5" (it restores the backup), or copy
+To undo: uninstall "Freakbear 3 Co-op 0.8.6" (it restores the backup), or copy
 data.win.coop-original over data.win manually while the game is closed.
 
 Docs in the game folder: README_RU.txt, CONNECT_RU.md, CUSTOM_CHARACTERS_RU.md.
