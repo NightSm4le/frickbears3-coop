@@ -121,7 +121,11 @@ if (stage == "full")
     need(D("gml_GlobalScript_CoopSpec").Contains("var _s = global.CoopS;\n    coop_prepare_night();\n    if (!_s.armed)"), "CRASH-GO: oGameOver Create hook does not fix Deaths first");
     need(D("gml_Object_oCoopNet_Step_0").Contains("if (room == Office && variable_global_exists(\"Night\"))\n    {\n        coop_prepare_night();\n    }"), "CRASH-GO: Office entry does not prepare Deaths");
     need(D("gml_GlobalScript_CoopMore").Contains("invalid -> using night "), "botmaze night clamp missing");
-    need(net.Contains("modver: \"0.8.4\""), "modver not 0.8.4");
+    // 0.8.5 (boss-fight systems)
+    need(more.Contains("var _runTitle") && more.Contains("TaskRunning = _i;"), "CRASH-SCRAP: stasks does not remap TaskRunning");
+    need(more.Contains("_B.scrapSent = false;") && more.Contains("_B.scrapTotal = 0;"), "SCRAP-DESYNC: per-night scrap state reset missing");
+    need(more.Contains("!coop_is_maze_room(_X.prevRoom) && _X.prevRoom != SalvageResults"), "MAZE-RETURN: Office-entry reset wipes same-night boss state");
+    need(net.Contains("modver: \"0.8.5\""), "modver not 0.8.5");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");

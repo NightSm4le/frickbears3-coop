@@ -220,3 +220,22 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
   Office entry and in `coop_apply_night` Endless.
 - `-coop-botmaze` without a night number: clamp 1..5 (was `_rooms[-1]`).
 - proto 8 unchanged, modver 0.8.4.
+
+## 0.8.5 (boss-fight systems, 2026-11-16)
+- CRASH-SCRAP: `stasks` replaced the client's `oScraptrap.Tasks` wholesale while `oControlPanel` Draw_77 reads
+  `Tasks[TaskRunning]` every frame -> index past the new list end = Code Error mid-fight. The running task is now
+  remapped by title (or dropped) before the replacement.
+- SCRAP-DESYNC: `scrapSent/scrapTitles/scrapTotal` survived into the next night (coop_scrap_step only resets them
+  while in Office without oScraptrap), so a second Scraptrap night never resynced the list/total. Reset on every
+  non-revive Office entry that is not a maze return.
+- MAZE-RETURN: the non-revive Office-entry reset also fired when coming back from a maze mid-night, wiping enrage,
+  hpKeep/lastHP and refilling revLeft. The reset now skips maze / SalvageResults returns (same night).
+- Host-death enrage alert said "partner died" on both sides; now "host down".
+- proto 8 unchanged, modver 0.8.5.
+- Release tooling: `installer/Freakbear3Coop.iss` (Inno Setup 6) builds `Freakbear3Coop-0.8.5-Setup.exe`;
+  `scripts/build_matrix.ps1` builds+verifies 4 bases x {std, unlock} and writes `installer/matrix.iss` +
+  `installer/patches/manifest.json`; `scripts/make_patches.ps1` encodes+round-trip-verifies the 8 xdelta patches;
+  `scripts/test_installer.ps1` runs the silent install/restore/repeat/boot test matrix on a game copy.
+  Supported bases: clean v2.1.5 c254b690…, Coop_Install 0.7.2@2.1.5 12405aa0…, 0.8.2 std 726022da…, 0.8.2 unlock 73a46750….
+  Tester base 988a… is not published: bridge via the official v0.8.2 patch first.
+  Backup name `data.win.coop-original` (never overwritten); uninstall restores it. No game files in installer/zip.

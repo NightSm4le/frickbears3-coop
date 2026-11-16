@@ -68,7 +68,7 @@ function coop_boss_roles_step()
     // the HOST's own death also enrages the survivor's boss (before: only the client's death did)
     if (coop_is_host() && global.Coop.connected && variable_global_exists("Night") && boss_fight_night())
     {
-        if (global.CoopS.spec && !_B.meDeadSeen) { _B.meDeadSeen = true; coop_boss_aggro("partner died", true); }
+        if (global.CoopS.spec && !_B.meDeadSeen) { _B.meDeadSeen = true; coop_boss_aggro("host down", true); }
         if (!global.CoopS.spec) { _B.meDeadSeen = false; }
     }
     if (!coop_boss_roles_active()) { _R.win = false; return; }

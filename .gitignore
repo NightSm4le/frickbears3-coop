@@ -3,3 +3,4 @@ local/
 *.win
 *.dat
 *.log
+installer/tools/
