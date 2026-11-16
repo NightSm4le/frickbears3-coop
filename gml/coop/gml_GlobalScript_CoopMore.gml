@@ -294,7 +294,21 @@ function coop_more_packet(_t, _m)
             coop_boss_aggro(_m.why, false);
             return true;
         case "stasks": // client: host's Scraptrap task list (same titles/durations on both sides)
-            if (coop_is_client() && instance_exists(oScraptrap)) { _B.scrapGotAt = current_time; oScraptrap.Tasks = _m.tasks; _B.scrapTotal = array_length(_m.tasks); _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list from host (" + string(array_length(_m.tasks)) + " tasks)"); }
+            if (coop_is_client() && instance_exists(oScraptrap))
+            {
+                _B.scrapGotAt = current_time;
+                // 0.8.5: oControlPanel Draw reads Tasks[TaskRunning] every frame - remap the running task by title
+                // before the list is replaced, or an index past the new list end is a Code Error mid-fight
+                var _runTitle = "";
+                with (oControlPanel) { if (TaskRunning != -1 && TaskRunning < array_length(oScraptrap.Tasks)) { _runTitle = oScraptrap.Tasks[TaskRunning].Title; } }
+                oScraptrap.Tasks = _m.tasks;
+                with (oControlPanel)
+                {
+                    TaskRunning = -1; TaskProgress = 0;
+                    if (_runTitle != "") { for (var _i = 0; _i < array_length(oScraptrap.Tasks); _i++) { if (oScraptrap.Tasks[_i].Title == _runTitle) { TaskRunning = _i; break; } } }
+                }
+                _B.scrapTotal = array_length(_m.tasks); _B.scrapTitles = coop_scrap_titles(); coop_log("SCRAP: task list from host (" + string(array_length(_m.tasks)) + " tasks)");
+            }
             return true;
         case "stask": // partner finished a task
             _B.scrapIn++;
@@ -733,12 +747,16 @@ function coop_more_step()
                 global.CoopF.revivedEnter = false;
                 coop_boss_revive_enter();
             }
-            else
+            else if (!coop_is_maze_room(_X.prevRoom) && _X.prevRoom != SalvageResults)
             {
+                // 0.8.5: returning from a maze / salvage results is the SAME night - keep enrage, shared HP and the revive counter
                 global.CoopF.revLeft = _g.revives;
                 if (!_g.jd) { global.CoopF.jd.done = true; }
                 _B.aggro = 0; _B.pDeadSeen = false; _B.meDeadSeen = false; global.CoopBR.dmgAdj = 0; global.CoopBR.solo = false; global.CoopBR.winN = 0; _B.dmgIn = 0; _B.dmgOut = 0; _B.lastHP = -1; _B.botBossDone = false; _B.botScrapDone = false;
                 _B.hpKeep = -1; _B.deadDmg = 0; _B.restoreHP = -1; _B.reAggro = 0;
+                // 0.8.5: a second Scraptrap night in one session must resync the task list and the shared total
+                _B.scrapSent = false; _B.scrapTitles = []; _B.scrapTotal = 0; _B.scrapIn = 0; _B.scrapOut = 0;
+                _B.hostHP = -1; _B.hostPhase = 0;
             }
             _E.partnerEr = -1; _E.botBuyDone = false;
         }

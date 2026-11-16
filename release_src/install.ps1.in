@@ -1,19 +1,20 @@
-# FB3 Co-op TEST installer. Copies the game folder to a NEW folder and patches data.win there.
-# The original folder is only READ (never written). Usage: install.bat  (or: powershell -ExecutionPolicy Bypass -File install.ps1 [-GameDir "C:\...\Frickbears3"] [-DestName frickbears3-coop])
-param([string]$GameDir = "", [string]$DestName = "frickbears3-coop")
+# FB3 Co-op installer (legacy zip mechanism). Copies the game folder to a NEW folder and patches data.win there.
+# The original folder is only READ (never written). Usage: install.bat  (or: powershell -ExecutionPolicy Bypass -File install.ps1 [-GameDir "C:\...\Frickbears3"] [-DestName frickbears3-coop] [-Variant std|unlock])
+# Base detection and expected hashes come from manifest.json next to this script (same matrix as Setup.exe).
+param([string]$GameDir = "", [string]$DestName = "frickbears3-coop", [string]$Variant = "std")
 $ErrorActionPreference = "Stop"
-$SRC_SHA   = "@SRC_SHA@"   # base data.win (@SRC_NAME@)
-$OUT_SHA   = "@OUT_SHA@"                                                          # patched data.win
-$PATCH_SHA = "@PATCH_SHA@"
 $XD_SHA    = "6855c01cf4a1662ba421e6f95370cf9afa2b3ab6c148473c63efe60d634dfb9a"   # xdelta3-3.1.0-x86_64.exe (github.com/jmacd/xdelta-gpl, GPG-signed zip)
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 function Fail($m) { Write-Host ""; Write-Host "ОШИБКА: $m" -ForegroundColor Red; exit 1 }
 function Sha($p) { (Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToLower() }
+if ($Variant -ne "std" -and $Variant -ne "unlock") { Fail "Variant должен быть std или unlock." }
+$m = Get-Content -LiteralPath (Join-Path $Here "manifest.json") -Raw | ConvertFrom-Json
+$baseNames = @{}; foreach ($b in $m.bases) { $baseNames[$b.sha] = $b.name }
+$outSha = @{}; $patchSha = @{}; foreach ($t in $m.targets) { $outSha["$($t.base)_$($t.variant)"] = $t.out; $patchSha["$($t.base)_$($t.variant)"] = $t.patchSha }
 
-Write-Host "=== FB3 Co-op (тестовая сборка) — установка в отдельную папку ===" -ForegroundColor Cyan
-$xd = Join-Path $Here "xdelta3.exe"; $patch = Join-Path $Here "fb3coop.xdelta"
+Write-Host "=== FB3 Co-op $($m.version) — установка в отдельную папку ===" -ForegroundColor Cyan
+$xd = Join-Path $Here "xdelta3.exe"
 if (!(Test-Path -LiteralPath $xd) -or (Sha $xd) -ne $XD_SHA) { Fail "xdelta3.exe отсутствует или его SHA-256 не совпадает — распакуйте архив заново." }
-if (!(Test-Path -LiteralPath $patch) -or (Sha $patch) -ne $PATCH_SHA) { Fail "fb3coop.xdelta отсутствует или повреждён (SHA-256)." }
 
 if ($GameDir -eq "") {
     try {
@@ -29,7 +30,23 @@ $srcData = Join-Path $GameDir "data.win"
 if (!(Test-Path -LiteralPath (Join-Path $GameDir "Frickbears3.exe")) -or !(Test-Path -LiteralPath $srcData)) { Fail "В '$GameDir' нет Frickbears3.exe или data.win." }
 Write-Host "Проверяю SHA-256 исходного data.win..."
 $h = Sha $srcData
-if ($h -ne $SRC_SHA) { Fail "data.win не совпадает с базой @SRC_NAME@ (SHA-256 $h)." }
+$base = $baseNames[$h]
+$patchSrc = $srcData
+if (-not $base) {
+    $isOut = $false; foreach ($k in $outSha.Keys) { if ($outSha[$k] -eq $h) { $isOut = $true } }
+    $bak = Join-Path $GameDir "data.win.coop-original"
+    if ($isOut -and (Test-Path -LiteralPath $bak)) {
+        $hb = Sha $bak; $base = $baseNames[$hb]; $patchSrc = $bak
+        if ($base) { Write-Host "Кооп уже установлен: патчуется резервная копия базы ($base)." }
+    }
+    if (-not $base) {
+        Fail "data.win не совпадает ни с одной поддерживаемой базой (SHA-256 $h). Поддерживаются: чистая v2.1.5, Coop_Install 0.7.2 (2.1.5), кооп 0.8.2 и 0.8.2 UnlockAll. Тестовая база 988a...: сначала примените официальный патч v0.8.2 (он превращает 988a в 0.8.2), затем этот установщик."
+    }
+}
+$key = "${base}_$Variant"
+$patch = Join-Path $Here ("p_" + $key + ".xdelta")
+if (!(Test-Path -LiteralPath $patch) -or (Sha $patch) -ne $patchSha[$key]) { Fail "Патч p_$key.xdelta отсутствует или повреждён (SHA-256)." }
+$OUT_SHA = $outSha[$key]
 
 $parent = Split-Path -Parent ((Resolve-Path -LiteralPath $GameDir).Path)
 $dest = Join-Path $parent $DestName; $n = 2
@@ -40,15 +57,26 @@ Write-Host "Копирую игру в: $dest  (оригинал не измен
 New-Item -ItemType Directory -Path $dest | Out-Null
 Get-ChildItem -LiteralPath $srcFull -Force | Copy-Item -Destination $dest -Recurse -Force
 $newData = Join-Path $dest "data.win.new"
-Write-Host "Применяю патч..."
+Write-Host "Применяю патч ($base / $Variant)..."
 $runner = $env:FB3_RUNNER   # only for testing on Linux (e.g. "wine"); empty on Windows
-if ($runner) { & $runner $xd -d -f -s $srcData $patch $newData } else { & $xd -d -f -s $srcData $patch $newData }
+if ($runner) { & $runner $xd -d -f -s $patchSrc $patch $newData } else { & $xd -d -f -s $patchSrc $patch $newData }
 if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $newData)) { Fail "xdelta3 завершился с ошибкой (код $LASTEXITCODE). Копия осталась в $dest — её можно удалить." }
 if ((Sha $newData) -ne $OUT_SHA) { Fail "Результат патча не совпал по SHA-256. Копия в $dest — удалите её." }
+$bakDest = Join-Path $dest "data.win.coop-original"
+if (!(Test-Path -LiteralPath $bakDest)) { Copy-Item -LiteralPath (Join-Path $dest "data.win") -Destination $bakDest }
 Move-Item -LiteralPath $newData -Destination (Join-Path $dest "data.win") -Force
-foreach ($f in "Host.bat", "Join.bat", "README_RU.txt") { Copy-Item -LiteralPath (Join-Path $Here $f) -Destination $dest -Force }
-if ((Sha $srcData) -ne $SRC_SHA) { Fail "Неожиданно изменился исходный data.win!" }
+foreach ($f in "Host.bat", "Join.bat", "README_RU.txt", "CONNECT_RU.md", "CUSTOM_CHARACTERS_RU.md", "XDELTA_LICENSE.txt") { Copy-Item -LiteralPath (Join-Path $Here $f) -Destination $dest -Force }
+$srcAddons = Join-Path $Here "Addons\CoopChars"
+if (Test-Path -LiteralPath $srcAddons) {
+    Get-ChildItem -LiteralPath $srcAddons -Recurse -File | ForEach-Object {
+        $rel = $_.FullName.Substring($srcAddons.Length + 1)
+        $to = Join-Path (Join-Path $dest "Addons\CoopChars") $rel
+        if (!(Test-Path -LiteralPath $to)) { New-Item -ItemType Directory -Force -Path (Split-Path $to) | Out-Null; Copy-Item -LiteralPath $_.FullName -Destination $to }
+    }
+}
+if ((Sha $srcData) -ne $h) { Fail "Неожиданно изменился исходный data.win!" }
 Write-Host ""
-Write-Host "ГОТОВО. Кооп-версия: $dest" -ForegroundColor Green
+Write-Host "ГОТОВО. Кооп-версия $($m.version) ($Variant): $dest" -ForegroundColor Green
 Write-Host "Оригинал не тронут: $srcFull"
-Write-Host "Запуск: Host.bat (создать игру) или Join.bat (к другу через Porthole), подробнее README_RU.txt"
+Write-Host "Резервная копия базы внутри копии: data.win.coop-original"
+Write-Host "Запуск: Host.bat (создать игру) или Join.bat (к другу), подробнее README_RU.txt и CONNECT_RU.md"
