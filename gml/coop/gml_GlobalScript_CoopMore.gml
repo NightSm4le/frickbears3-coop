@@ -533,7 +533,14 @@ function coop_maze_step()
     var _inMaze = coop_is_maze_room(room) && instance_exists(oCamera3DMaze);
     var _pFresh = variable_struct_exists(_M, "pAt") && current_time - _M.pAt < 1500;
     _M.sync = _c.connected && global.CoopCfg.maze && _inMaze && _pFresh && _M.prm == room_get_name(room);
-    if (!_inMaze) { _M.ghost = false; _M.ghostDone = false; _M.meCaught = false; _M.pAlive = true; _M.spawnSent = false; _M.puppets = 0; _M.botSpawnDone = false; if (instance_exists(_M.peer)) { instance_destroy(_M.peer); } _M.peer = noone; }
+    if (!_inMaze)
+    {
+        // 0.8.6: pause deactivates everything except oCoopNet, and instance_exists() is false for
+        // deactivated instances. Clearing _M.peer here would orphan the sleeping billboard (the
+        // destroy guard misses it too) and every resume would create another one - the ESC clone bug.
+        if (coop_is_maze_room(room)) { return; }
+        _M.ghost = false; _M.ghostDone = false; _M.meCaught = false; _M.pAlive = true; _M.spawnSent = false; _M.puppets = 0; _M.botSpawnDone = false; if (instance_exists(_M.peer)) { instance_destroy(_M.peer); } _M.peer = noone;
+    }
     // host pulls the partner into its maze room
     if (coop_is_host() && _c.connected && global.CoopCfg.maze && _inMaze && current_time - _M.lastSend > 1000 && !(_pFresh && _M.prm == room_get_name(room)))
     {
@@ -586,7 +593,7 @@ function coop_maze_step()
         _M.logAt = current_time;
         var _ne = instance_nearest(oCamera3DMaze.x, oCamera3DMaze.y, oMazeEnemy);
         coop_log("MAZE: sync me=" + string(round(oCamera3DMaze.x)) + "," + string(round(oCamera3DMaze.y)) + " partner=" + string(round(_M.px)) + "," + string(round(_M.py)) + " pAlive=" + string(_M.pAlive)
-            + " enemies=" + string(instance_number(oMazeEnemy)) + (_ne != noone ? " nearestEnemy=" + string(round(_ne.x)) + "," + string(round(_ne.y)) + " mode=" + _ne.Mode : "") + " " + _M.targetLog);
+            + " enemies=" + string(instance_number(oMazeEnemy)) + " peers=" + string(instance_number(oCoopMazePeer)) + (_ne != noone ? " nearestEnemy=" + string(round(_ne.x)) + "," + string(round(_ne.y)) + " mode=" + _ne.Mode : "") + " " + _M.targetLog);
     }
 }
 
@@ -915,9 +922,12 @@ function coop_more_draw()
     }
     // 0.8.3 (UX-S16-S1/S2): one shared progress line, identical on both sides (total = list size when the host sent /
     // the client received the task list, left = shared remaining tasks); only once the list was synced this night.
-    // Note: oScraptrap is a REGULAR vanilla animatronic (id 63), spawned by the night's AI setup - not a boss.
+    // Note: oScraptrap is a REGULAR vanilla animatronic (id 63), not a boss. The instance is PLACED in the
+    // Office room every night and its Create builds the 9 tasks even at AI 0, so instance existence alone
+    // would advertise tasks on nights where he is inactive (live report: "Scraptrap isn't here but the
+    // message shows", roster AI0 on nights 3-4). Gate on his AI for this night.
     // Its tasks are run on the control panel in the back of the office; the mod only mirrors the shared progress.
-    if (room == Office && _c.connected && _scraptrap != noone && _B.scrapTotal > 0)
+    if (room == Office && _c.connected && _scraptrap != noone && _B.scrapTotal > 0 && global.AILevels[63] > 0)
     {
         var _ty = (_salvage != noone && global.CoopCfg.bossShared) ? 64 : 48; // below the cam strip and alert banner
         // 0.6.4 (S3-4): with the cams up, centre it over the camera view (right of the cam map and clear of its corner marks)

@@ -207,7 +207,10 @@ function coop_hd_draw()
 function coop_maze_spawn_step()
 {
     var _S = global.CoopS3, _c = global.Coop;
-    if (!coop_is_maze_room(room) || !instance_exists(oCamera3DMaze)) { _S.spawnRoom = -1; _S.spawnDone = false; _S.lookDone = false; _S.lookShot = false; return; }
+    if (!coop_is_maze_room(room)) { _S.spawnRoom = -1; _S.spawnDone = false; _S.lookDone = false; _S.lookShot = false; return; }
+    // 0.8.6: pause deactivates the maze camera, so instance_exists() is false while paused.
+    // Resetting here re-applied the client spawn offset on every resume (96 px teleport per ESC).
+    if (!instance_exists(oCamera3DMaze)) { return; }
     if (_S.spawnRoom != room) { _S.spawnRoom = room; _S.mzIn = current_time; _S.spawnDone = false; _S.lookDone = false; _S.lookShot = false; }
     if (_S.spawnDone || !coop_is_client() || !_c.connected || !global.CoopCfg.maze) { return; }
     _S.spawnDone = true;

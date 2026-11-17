@@ -19,7 +19,14 @@ $baseFiles = @{
   coop072 = "$Work/dl/coopinstall072/Coop_Install/data.win"
   std082 = "$Work/bases/data082std.win"
   unlock082 = "$Work/bases/data082unlock.win"
-  v202 = "C:/Users/PC/Desktop/frickbears3-4ld-v2.0.2/data.win"
+  v202 = "$Work/testgame/unsupported.win"
+}
+# case9 fixture: the old v2.0.2 / tester bases are no longer on this box; the installer rejects by
+# SHA-256 whitelist, so any non-whitelisted file exercises the same path. Flip one byte of clean215.
+if (-not (Test-Path $baseFiles['v202'])) {
+  $bytes = [IO.File]::ReadAllBytes($baseFiles['clean215'])
+  $bytes[1024] = $bytes[1024] -bxor 0xFF
+  [IO.File]::WriteAllBytes($baseFiles['v202'], $bytes)
 }
 if (-not (Test-Path "$g/Frickbears3.exe")) {
   New-Item -ItemType Directory -Force -Path $g | Out-Null

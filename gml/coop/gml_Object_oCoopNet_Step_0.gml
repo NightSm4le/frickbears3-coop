@@ -119,6 +119,12 @@ if (_c.bot)
         if (instance_exists(oCamera)) { oCamera.Block6AMTransition = true; }
         coop_log("bot: LATCH TEST - clock at 5:59 with Block6AMTransition stuck and no killer -> the watchdog must clear it");
     }
+    if (_c.botMaze >= 0 && !BotMazeDone && room == Office && variable_global_exists("Timer") && global.Timer >= _c.botMaze)
+    {
+        BotMazeDone = true;
+        coop_log("bot: MAZE TEST - entering MinigameMaze_1 (ESC pauses must not clone the partner billboard)");
+        room_goto(MinigameMaze_1);
+    }
     if (_c.botWin >= 0 && !BotWinDone && room == Office && variable_global_exists("Timer") && ((is_real(global.Night) && global.Timer >= _c.botWin) || (!is_real(global.Night) && BotOfficeFrames >= _c.botWin * 60))) // 0.6.0: Custom/Endless timer is not a 0-based clock -> use seconds in Office
     {
         BotWinDone = true;

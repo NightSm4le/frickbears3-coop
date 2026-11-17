@@ -250,16 +250,43 @@ Tested: pwsh 7.6.9 (linux) + xdelta3.exe under Wine on a read-only game copy —
   and by clock-sync drops updating `lastOfficeTimer`) sends `nrestart`; the receiver follows: spectator -> `coop_spec_follow_restart()`
   (fresh night, death stays uncounted), alive -> `room_restart()`. Handshake now rejects a mismatched `modver` ("bad mod version").
 - SPEC-PM: spectator P ping overlay and M mark removed (keys, receiver branch, bot spec-mark flag); footer keeps only the win-rule hint.
-- SPEC-QUALITY: stream budget 512 -> 1024 KB/s, inflight cap 2 -> 3 (2 frames in flight capped fps at ~2/RTT), ladder intervals retuned to
-  10-20 fps per level (`COOP_LV` 1080p@100ms ... 360p@50ms). Live: adaptive climb 360p -> 540p -> 720p -> 1080p on localhost.
+- SPEC-QUALITY / SPEC-FPS: stream budget 512 -> 1024 KB/s, inflight cap 2 -> 4 (2 frames in flight capped fps at ~2/RTT). Three successive root causes were
+  found from live reports and sender instrumentation (`stream: win` logs cap/cmp ms, call gap, send gap): (a) `buffer_compress` of the raw RGBA frame is
+  CPU-bound (~200 ms at 1080p, ~12 ms at 360p on the test box) so the sender stalls while lat/kbps look fine; (b) the old `lat < 150` upshift gate froze
+  high-RTT links at the bottom tier; (c) THE cadence bug: the sender runs in Draw GUI End at game fps and frame times jitter 12-32 ms, so ANY ms-based
+  interval gate loses whole frames whenever the accumulated integer-ms diff lands 1 ms short (16 ms tier sent every 33 ms, 33 ms every 49, 66 ms every
+  85 - exactly the live "11 fps at 360p" and "20 fps at 144p" reports). Cadence is now frame-quantized: COOP_LV rows carry N ticks per send
+  (1 -> 60 fps, 2 -> 30, 3 -> 20, 6 -> 10 at a 60 fps game). Controller measures achieved send fps per 3 s window, targets 60/N capped by the ack-window
+  capacity (4 frames / RTT), downshifts below 80% (blacklists the tier 60 s, also on kbps > budget), upshifts only at >= 95% saturation with kbps < 60%
+  budget, and skips fps judgement in the first 4 s warm-up window (surface/GPU stall used to blacklist the starting tier on every restart).
+  Measured on the test box: 640x360 ~27-30 fps stable (the sender's own zlib cost loads the game to ~54 fps, so 30 is the ceiling there), 480x270 ~50 fps,
+  320x180 60 fps; under 220 ms simulated ack lag 640x360 ~14 fps (window-limited). 1080p60 is NOT possible in this engine: single-threaded zlib, no video
+  codec; 1080p sustains only ~10 fps even on a fast CPU. Faster PCs/links probe upward automatically.
+- MAZE-PAUSE (ESC clone): pause = `instance_deactivate_all(true)` + oCoopNet re-activated (0.6.x freeze fix). `instance_exists()` is false for deactivated
+  instances, so `coop_maze_step`'s !_inMaze cleanup reset `_M.peer = noone` while the deactivated billboard survived (the destroy guard missed it too);
+  every resume then created a second oCoopMazePeer - one clone per ESC (user log: 80 "partner billboard created", one per pause cycle). Fix: when the room is
+  still a maze room but the camera is deactivated, return without touching peer tracking. MAZE sync log now prints `peers=` for evidence.
+- MAZE-TP (ESC teleport): the same deactivation trap in `coop_maze_spawn_step` (CoopS3): camera missing => spawn state reset, so every resume re-applied
+  the client's 96 px spawn offset from its CURRENT position (user log: "client spawn moved 96 px" ~30 ms after each "partner resumed", alternating
+  830,374 <-> 926,374). Fix: reset spawn state only when the room is not a maze room; a merely deactivated camera keeps the state. Live T8: one spawn
+  move at maze entry, zero across three real ESC cycles, position identical before/after each resume.
 - SPEC-AUDIO: vanilla `audio_play_sound/stop_sound/stop_all` calls rewritten to `coop_audio_play/stop/stop_all` wrappers (apply.csx, all non-Coop
   entries); wrappers forward `snd/sndstop/sndall` packets while streaming and RETURN the sound id (oEnnard Create does audio_sound_gain on it -
   first smoke build crashed there without the return). Receiver plays only while spectating; `audio_stop_all` on every spec-exit path and on stream stop.
 - SCRAP-HUD: oScraptrap is a REGULAR vanilla animatronic (id 63), not a boss; tasks run on the control panel at the back of the office.
+- SCRAP-AI: the oScraptrap instance is PLACED in the Office room every night (room instance id 100087, no creation code) and its Create builds the 9
+  tasks even at AI 0, so the 0.8.6 first cut's existence-only gate advertised "SCRAPTRAP done 0/9" on nights where he is inactive (live report
+  "Scraptrap isn't here but the message shows"; user roster log nights 3-4: Scraptrap(63,...,AI0)). The HUD line now also requires
+  `global.AILevels[63] > 0` (AI levels sync host->client in the periodic snap, so both sides agree). The vanilla control panel still lists the tasks
+  at AI 0 - untouched, that is original behaviour. Verify check SCRAP-AI failed on the pre-fix build, passes after; live screenshots s1 (night 1, AI0:
+  no line on either side) and s2 (-coop-botscrap forces AI 10: line on both sides).
   HUD line now says "run tasks on the control panel, back of office".
 - Test flags: `-coop-botrestart T` (room_restart at timer T), `-coop-bot6am T` (clock to 5:59 + Blank id 80 active), `-coop-botlatch T`
-  (clock to 5:59 with Block6AMTransition stuck, no killer).
-- Live pair tests (two Windows instances, localhost, bot flags): T1 death->spectator + audio packets + 1080p stream + host restart followed by the
+  (clock to 5:59 with Block6AMTransition stuck, no killer), `-coop-botmaze T` (room_goto MinigameMaze_1 at timer T; ESC pauses sent by the test harness).
+- Live pair tests (two Windows instances, localhost, bot flags): T1 death->spectator + audio packets + stable adaptive stream + host restart followed by the
   dead partner; T2/T3 alive partner follows a restart in both directions; T4 6AM kill passes the gate on both sides, killer name kept, GameOver,
-  clock frozen at 362.5; T5 stuck latch cleared by the watchdog on both sides -> win_night -> NightClear.
+  clock frozen at 362.5; T5 stuck latch cleared by the watchdog on both sides -> win_night -> NightClear; T6 maze + three real ESC pause/resume cycles
+  (SendKeys): exactly one partner billboard per side, `peers=1` in every sync line after each resume (pre-fix: one clone per cycle), and the client
+  spawn offset applied exactly once at maze entry with positions unchanged across resumes (pre-fix: 96 px teleport per resume); T7 spectator with
+  220 ms simulated ack lag: single quality probe, then a stable tier with forwarded audio, no oscillation.
 - proto 8 unchanged, modver 0.8.6 (now enforced at handshake).

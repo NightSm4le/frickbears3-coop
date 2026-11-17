@@ -66,7 +66,8 @@ global.Coop = {
     botDie: -1,
     botRestart: -1,
     bot6am: -1,
-    botLatch: -1
+    botLatch: -1,
+    botMaze: -1
 };
 
 global.CoopPause = { remotePending: false, remoteOpening: false, remotePaused: false, remoteResume: false, localPaused: false, opening: false };
@@ -260,6 +261,7 @@ function coop_parse_args()
         else if (_p == "-coop-botrestart" && i + 1 < _n) { i++; _c.botRestart = coop_arg_num(parameter_string(i), 0); } // 0.8.6: restart the night at timer N (tests the partner follow)
         else if (_p == "-coop-bot6am" && i + 1 < _n) { i++; _c.bot6am = coop_arg_num(parameter_string(i), 0); } // 0.8.6: jump the clock to 5:59 with Blank active (tests the end-of-night kill gate)
         else if (_p == "-coop-botlatch" && i + 1 < _n) { i++; _c.botLatch = coop_arg_num(parameter_string(i), 0); } // 0.8.6: stick Block6AMTransition at 5:59 with no killer (tests the watchdog)
+        else if (_p == "-coop-botmaze" && i + 1 < _n) { i++; _c.botMaze = coop_arg_num(parameter_string(i), 0); } // 0.8.6: enter MinigameMaze_1 at timer N (tests the ESC pause billboard clone fix)
     }
     coop_spec_parse_args();
     coop_feat_parse_args();

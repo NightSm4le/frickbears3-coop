@@ -17,3 +17,4 @@ BotShotLogged = false;
 BotRestartDone = false;
 Bot6amDone = false;
 BotLatchDone = false;
+BotMazeDone = false;

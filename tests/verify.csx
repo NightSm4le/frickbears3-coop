@@ -54,7 +54,7 @@ if (stage == "full")
     var spec = D("gml_GlobalScript_CoopSpec");
     need(spec.Contains("DEV STREAM") && spec.Contains("Frames received"), "spectator developer diagnostics missing");
     need(spec.Contains("budget: 1024"), "spectator bandwidth budget missing");
-    need(spec.Contains("level: 3") && spec.Contains("if (_inflight >= 3)"), "spectator stream is not rate-limited to protect control traffic");
+    need(spec.Contains("level: 3") && spec.Contains("if (_inflight >= 4)"), "spectator stream is not rate-limited to protect control traffic");
     need(spec.Contains("1920, 1080") && spec.Contains("1280, 720"), "1080p adaptive spectator levels missing");
     need(spec.Contains("specgiveack") && spec.Contains("POWER USED"), "spectator once-per-night power assist missing");
     need(spec.Contains("Lure sent to partner; it only works on a nearby animatronic") && spec.Contains("L (partner)"), "L action purpose is unclear");
@@ -138,8 +138,14 @@ if (stage == "full")
     need(!spec6.Contains("P: ping") && !feat6.Contains("key M spectator") && !feat6.Contains("botSpecMark"), "SPEC-PM: spectator ping/mark not removed");
     need(spec6.Contains("function coop_audio_play(") && spec6.Contains("case \"snd\":") && spec6.Contains("_r = audio_play_sound(arg0, arg1, arg2);") && spec6.Contains("return _r;"), "SPEC-AUDIO: forwarding wrappers/receiver missing or sound id not returned");
     need(D("gml_Object_oShopItemUltra_Clock_Draw_77").Contains("coop_audio_play("), "SPEC-AUDIO: vanilla audio calls not rewritten");
-    need(spec6.Contains("budget: 1024") && spec6.Contains("[640, 360, 50]") && spec6.Contains("_inflight >= 3"), "SPEC-QUALITY: stream tuning missing");
+    need(spec6.Contains("budget: 1024") && spec6.Contains("[640, 360, 33, 2]") && spec6.Contains("_inflight >= 4"), "SPEC-QUALITY: stream tuning missing");
+    need(spec6.Contains("framesWin") && spec6.Contains("_eff * 0.8") && spec6.Contains("_eff * 0.95") && spec6.Contains("[480, 270, 16, 1]") && spec6.Contains("tickN") && spec6.Contains("60 / _lv") && spec6.Contains("warmUntil"), "SPEC-FPS: achieved-fps feedback / saturation upshift / frame-quantized cadence / warm-up skip missing");
+    need(more.Contains("if (coop_is_maze_room(room))") && more.Contains("peers="), "MAZE-PAUSE: peer tracking survives pause deactivation (ESC clone fix)");
+    var s3 = D("gml_GlobalScript_CoopS3");
+    need(s3.Contains("if (!coop_is_maze_room(room))") && s3.Contains("if (!instance_exists(oCamera3DMaze))"), "MAZE-TP: spawn state must survive pause deactivation (ESC teleport fix)");
+    need(net.Contains("-coop-botmaze") && step6.Contains("botMaze"), "MAZE-PAUSE: maze test flag missing");
     need(more.Contains("run tasks on the control panel"), "SCRAP-HUD: task location hint missing");
+    need(more.Contains("_B.scrapTotal > 0 && global.AILevels[63] > 0"), "SCRAP-AI: HUD must hide on nights where Scraptrap is inactive (AI 0)");
     bool unlockBuild = Environment.GetEnvironmentVariable("COOP_UNLOCKALL") == "1";
     var ncreate = D("gml_Object_oCoopNet_Create_0");
     need(unlockBuild == ncreate.Contains("global.CoopF.unlockBuild = true"), unlockBuild ? "S9-6 Unlock All build does not default to _coop_unlockall" : "Unlock All save tag leaked into the standard build");

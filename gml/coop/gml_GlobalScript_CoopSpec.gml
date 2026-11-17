@@ -13,7 +13,7 @@ global.CoopS = {
     frameSurf: -1, fw: 0, fh: 0, framesIn: 0, lastFrameAt: 0, fpsT: 0, fpsN: 0, rfps: 0, inLevel: -1, ackQ: [], botLag: 0,
     // sender
     capSurf: -1, seq: 0, ackSeq: 0, sentAt: array_create(64, 0), level: 3, lastSend: -100000, lastAdapt: 0,
-    lat: -1, bytesWin: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 1024, sending: false,
+    lat: -1, bytesWin: 0, framesWin: 0, fpsOut: 0, kbps: 0, framesOut: 0, lastSize: 0, budget: 1024, sending: false, badUntil: [0, 0, 0, 0, 0, 0, 0], capMs: 0, cmpMs: 0, callsWin: 0, cgSum: 0, lastCall: 0, gapSum: 0, gapN: 0, warmUntil: 0, tickN: 0,
     rxBytesWin: 0, rxKbps: 0, rxRateAt: 0, lastFrameSize: 0, sndIn: 0,
     // help
     cdGive: -100000, cdWarn: -100000, warnUntil: 0, warnWhere: "", warnName: "", cdLure: -100000, hintUntil: 0, hintSeen: false,
@@ -21,8 +21,11 @@ global.CoopS = {
     botHelp: -1, botHelpStep: 0, botHelpAt: 0, botDie: -1, botDieDone: false, botDieAt: 0, shotPend: "", shotAt: 0, specShot: false, btnShot: false,
     st: { specIn: 0, specWin: 0, specLose: 0, skipped: 0, counted: 0, framesOut: 0, framesIn: 0, levelUp: 0, levelDown: 0, give: 0, warn: 0, lure: 0, giveIn: 0, warnIn: 0, lureIn: 0, refunds: 0 }
 };
-// [w, h, interval ms] - 0.8.6: faster mid tiers (the old 100 ms cap read as ~9 fps) and a 1 MB/s budget
-#macro COOP_LV [[1920, 1080, 100], [1280, 720, 85], [960, 540, 66], [640, 360, 50], [480, 270, 50], [320, 180, 66], [256, 144, 80]]
+// [w, h, interval ms, send every N ticks] - 0.8.6: the sender runs in Draw GUI End at game fps, and
+// frame times jitter 12-32 ms, so any ms-based gate loses whole frames (16 ms tier sent every 33 ms,
+// 66 ms tier every 85 ms - the live "11 fps" / "20 fps" reports). Cadence is frame-quantized instead:
+// N=1 -> 60 fps, 2 -> 30, 3 -> 20, 6 -> 10 at a 60 fps game. interval ms is kept for logs/targets.
+#macro COOP_LV [[1920, 1080, 100, 6], [1280, 720, 50, 3], [960, 540, 33, 2], [640, 360, 33, 2], [480, 270, 16, 1], [320, 180, 16, 1], [256, 144, 16, 1]]
 
 function coop_spec_parse_args()
 {
@@ -264,23 +267,52 @@ function coop_stream_tick()
     var _s = global.CoopS, _c = global.Coop;
     var _want = room == Office && _c.connected && current_time - _c.partnerSnapAt < 3000 && coop_partner_get("sp", 0);
     if (!_want) { if (_s.sending) { _s.sending = false; coop_send({ t: "sndall" }); coop_log("stream: stop (frames " + string(_s.framesOut) + ")"); } return; }
-    if (!_s.sending) { _s.sending = true; _s.ackSeq = _s.seq; _s.lastAdapt = current_time; _s.bytesWin = 0; coop_log("stream: start, level " + string(_s.level)); }
+    if (!_s.sending) { _s.sending = true; _s.ackSeq = _s.seq; _s.lastAdapt = current_time; _s.warmUntil = current_time + 4000; _s.bytesWin = 0; _s.framesWin = 0; _s.capMs = 0; _s.cmpMs = 0; _s.callsWin = 0; _s.cgSum = 0; _s.gapSum = 0; _s.gapN = 0; coop_log("stream: start, level " + string(_s.level)); }
     var _lv = COOP_LV;
     var _inflight = _s.seq - _s.ackSeq;
+    _s.callsWin++;
+    _s.cgSum += current_time - _s.lastCall; _s.lastCall = current_time;
     // adapt every 3 s: latency of acks (includes relay RTT) and bandwidth budget
     if (current_time - _s.lastAdapt >= 3000)
     {
-        _s.kbps = _s.bytesWin / 1024 / ((current_time - _s.lastAdapt) / 1000);
-        _s.bytesWin = 0; _s.lastAdapt = current_time;
+        var _win = (current_time - _s.lastAdapt) / 1000;
+        _s.kbps = _s.bytesWin / 1024 / _win;
+        // 0.8.6: achieved send fps. At 1080p the zlib compress of the raw RGBA frame can cost
+        // ~200 ms, so the sender stalls at ~5 fps while lat/kbps still look fine - without this
+        // feedback the controller never leaves the top tier (live report: 1080p 4.9 fps).
+        _s.fpsOut = _s.framesWin / _win;
+        var _nf = max(1, _s.framesWin);
+        var _cap = _s.capMs / _nf, _cmp = _s.cmpMs / _nf;
+        coop_log("stream: win " + string_format(_s.fpsOut, 1, 1) + " fps, cap " + string_format(_cap, 1, 0) + " ms, cmp " + string_format(_cmp, 1, 0) + " ms, " + string_format(_s.kbps, 1, 1) + " KB/s, level " + string(_s.level) + ", game " + string_format(fps_real, 1, 1) + " fps, calls " + string_format(_s.callsWin / _win, 1, 1) + "/s, callgap " + string_format(_s.cgSum / max(1, _s.callsWin), 1, 1) + " ms, sendgap " + string_format(_s.gapSum / max(1, _s.gapN), 1, 1) + " ms");
+        _s.bytesWin = 0; _s.framesWin = 0; _s.capMs = 0; _s.cmpMs = 0; _s.callsWin = 0; _s.cgSum = 0; _s.gapSum = 0; _s.gapN = 0; _s.lastAdapt = current_time;
         var _old = _s.level;
-        if ((_s.lat > 400 || _s.kbps > _s.budget || _inflight >= 24) && _s.level < array_length(_lv) - 1) { _s.level++; _s.st.levelDown++; }
-        else if (_s.lat >= 0 && _s.lat < 150 && _inflight < 16 && _s.kbps < _s.budget * 0.5 && _s.level > 0) { _s.level--; _s.st.levelUp++; }
-        if (_old != _s.level) { coop_log("stream: level " + string(_old) + " -> " + string(_s.level) + " (" + string(_lv[_s.level][0]) + "x" + string(_lv[_s.level][1]) + " every " + string(_lv[_s.level][2]) + "ms; ack lat " + string(round(_s.lat)) + "ms, " + string_format(_s.kbps, 1, 1) + " KB/s, inflight " + string(_inflight) + ")"); }
+        // target fps = 60 game fps / N ticks per send (a 16 ms tier can never exceed the game fps)
+        var _want = 60 / _lv[_s.level][3];
+        // achievable fps = tier target capped by the ack-window capacity (4 frames / RTT)
+        var _eff = min(_want, 4000 / max(1, _s.lat));
+        // first window after stream start carries the surface/GPU warm-up stall; judging fps there
+        // blacklists the starting tier for 60 s on a transient (live restart tests)
+        var _warm = current_time < _s.warmUntil;
+        if ((_s.lat > 400 || _s.kbps > _s.budget || _inflight >= 24 || (!_warm && _s.fpsOut < _eff * 0.8)) && _s.level < array_length(_lv) - 1)
+        {
+            // 0.8.6: a tier that just proved too slow (CPU compress or window) is not retried for 60 s,
+            // else the controller ping-pongs between it and the tier below every adapt window.
+            if ((!_warm && _s.fpsOut < _eff * 0.8) || _s.kbps > _s.budget) { _s.badUntil[_old] = current_time + 60000; }
+            _s.level++; _s.st.levelDown++;
+        }
+        // 0.8.6: climb only when the current tier is SATURATED (>= 95% of its achievable fps) with
+        // bandwidth headroom; a too-slow next tier is discovered by a 3 s probe and blacklisted for
+        // 60 s (badUntil). The old lat < 150 gate froze high-RTT links at 360p forever.
+        else if (!_warm && _s.lat >= 0 && _s.kbps < _s.budget * 0.6 && _s.fpsOut >= _eff * 0.95 && _s.level > 0 && current_time >= _s.badUntil[_s.level - 1]) { _s.level--; _s.st.levelUp++; }
+        if (_old != _s.level) { coop_log("stream: level " + string(_old) + " -> " + string(_s.level) + " (" + string(_lv[_s.level][0]) + "x" + string(_lv[_s.level][1]) + " every " + string(_lv[_s.level][2]) + "ms; ack lat " + string(round(_s.lat)) + "ms, " + string_format(_s.kbps, 1, 1) + " KB/s, out " + string_format(_s.fpsOut, 1, 1) + " fps, inflight " + string(_inflight) + ")"); }
     }
-    // Keep at most three video frames queued on the shared TCP socket so control packets
+    // Keep at most four video frames queued on the shared TCP socket so control packets
     // are not stuck behind a backlog of spectator frames (0.8.6: 2 frames capped fps at ~2/RTT, e.g. 9 fps at 170 ms).
-    if (_inflight >= 3) { if (current_time - _s.lastSend > 4000) { _s.ackSeq = _s.seq; coop_log("stream: acks stalled 4s, resync"); } return; }
-    if (current_time - _s.lastSend < _lv[_s.level][2]) { return; }
+    if (_inflight >= 4) { if (current_time - _s.lastSend > 4000) { _s.ackSeq = _s.seq; coop_log("stream: acks stalled 4s, resync"); } return; }
+    // 0.8.6: frame-quantized cadence (see COOP_LV). A ms gate under frame jitter loses whole frames.
+    _s.tickN++;
+    if (_s.tickN < _lv[_s.level][3]) { return; }
+    _s.tickN = 0;
     var _w = _lv[_s.level][0], _h = _lv[_s.level][1];
     var _src = surface_exists(global.UISurface) ? global.UISurface : application_surface;
     if (!surface_exists(_src)) { return; }
@@ -291,9 +323,12 @@ function coop_stream_tick()
     draw_surface_stretched(_src, 0, 0, _w, _h);
     gpu_set_blendenable(true);
     surface_reset_target();
+    var _t0 = current_time;
     var _raw = buffer_create(_w * _h * 4, buffer_fixed, 1);
     buffer_get_surface(_raw, _s.capSurf, 0);
+    var _t1 = current_time;
     var _cmp = buffer_compress(_raw, 0, _w * _h * 4);
+    _s.capMs += _t1 - _t0; _s.cmpMs += current_time - _t1;
     buffer_delete(_raw);
     var _csz = buffer_get_size(_cmp);
     var _pk = buffer_create(10 + _csz, buffer_fixed, 1);
@@ -303,8 +338,8 @@ function coop_stream_tick()
     buffer_delete(_cmp);
     network_send_packet(_c.sock, _pk, 10 + _csz);
     buffer_delete(_pk);
-    _c.bytesOut += 10 + _csz; _s.bytesWin += 10 + _csz; _s.lastSize = 10 + _csz;
-    _s.sentAt[_s.seq mod 64] = current_time; _s.lastSend = current_time; _s.framesOut++; _s.st.framesOut++;
+    _c.bytesOut += 10 + _csz; _s.bytesWin += 10 + _csz; _s.framesWin++; _s.lastSize = 10 + _csz;
+    _s.sentAt[_s.seq mod 64] = current_time; _s.gapSum += current_time - _s.lastSend; _s.gapN++; _s.lastSend = current_time; _s.framesOut++; _s.st.framesOut++;
     if (_s.framesOut == 1 || _s.framesOut mod 40 == 0) { coop_log("stream: frame #" + string(_s.seq) + " " + string(_w) + "x" + string(_h) + " " + string(10 + _csz) + " bytes (raw " + string(_w * _h * 4) + "), lat " + string(round(_s.lat)) + "ms"); }
 }
 

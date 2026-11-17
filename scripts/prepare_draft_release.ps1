@@ -13,6 +13,15 @@ $body = [IO.File]::ReadAllText("$Repo/docs/RELEASE_0.8.6.md", [System.Text.Encod
 if ($existing) {
   $rel = $existing
   Write-Output "DRAFT REUSED id=$($rel.id) url=$($rel.html_url) draft=$($rel.draft)"
+  $patch = @{ name = "FB3 Co-op 0.8.6"; body = $body; draft = $true; prerelease = $false } | ConvertTo-Json -Depth 4
+  $rel = Invoke-RestMethod -Method Patch -Uri "$api/releases/$($rel.id)" -Headers $H -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($patch))
+  Write-Output "DRAFT BODY UPDATED from docs/RELEASE_0.8.6.md"
+  foreach ($a in @($rel.assets)) {
+    if ($a.name -in @("Freakbear3Coop-0.8.6-Setup.exe", "FB3-Coop-0.8.6.zip", "SHA256SUMS.txt")) {
+      Invoke-RestMethod -Method Delete -Uri "$api/releases/assets/$($a.id)" -Headers $H | Out-Null
+      Write-Output "STALE ASSET DELETED: $($a.name) (will re-upload)"
+    }
+  }
 } else {
   $payload = @{ tag_name = "v0.8.6"; target_commitish = "master"; name = "FB3 Co-op 0.8.6"; body = $body; draft = $true; prerelease = $false } | ConvertTo-Json -Depth 4
   $rel = Invoke-RestMethod -Method Post -Uri "$api/releases" -Headers $H -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($payload))
